@@ -377,7 +377,7 @@ namespace ClassroomHud
                 S.Memo = ""; S.Save(); ver++; Render(true);
                 return;
             }
-            else if (id == "linkadd") { OpenSettings("바로가기"); return; }
+            else if (id == "linkadd") { AddLinkFromWidget(); return; }
             else if (id.StartsWith("link:"))
             {
                 int i; if (int.TryParse(id.Substring(5), out i) && i < S.Links.Count)
@@ -662,6 +662,20 @@ namespace ClassroomHud
         {
             base.OnResize(e);
             if (WindowState == FormWindowState.Normal && IsHandleCreated) { miShow.Text = "숨기기"; ver++; Render(true); }
+        }
+
+        // 바로가기 줄의 [+]: 주소 넣는 작은 창
+        void AddLinkFromWidget()
+        {
+            st.Hover = false; ver++; Render(true);
+            using (var d = new LinkDialog(null))
+            {
+                if (d.ShowDialog() != DialogResult.OK || d.Result == null) return;
+                S.Links.Add(d.Result); S.Save();
+                try { LinkIcons.Get(d.Result.Url); } catch { }
+                if (settingsForm != null && !settingsForm.IsDisposed) settingsForm.AddLinkRow(d.Result);
+            }
+            ver++; Render(true);
         }
 
         void UpdateReady(string v)

@@ -499,7 +499,11 @@ namespace ClassroomHud
         {
             var gs = new List<Grp>();
             gs.Add(G("모드", false, B("m0", "시간표", S.Mode == 0), B("m1", "타이머", S.Mode == 1), B("m2", "스톱워치", S.Mode == 2)));
-            gs.Add(G("교실 도구", false, B("msgs", "선생님 안내", st.Popup == 2), B("pick", "뽑기"), B("memo", "텍스트", st.MemoEdit), B("week", "이번 주")));
+            var tools = new List<Btn>();
+            foreach (var t in Settings.ToolList)
+                if (S.Tools == null || S.Tools.Contains(t[0]))
+                    tools.Add(B(t[0], t[1], (t[0] == "msgs" && st.Popup == 2) || (t[0] == "memo" && st.MemoEdit)));
+            if (tools.Count > 0) gs.Add(G("교실 도구", false, tools.ToArray()));
             var sys = G(null, false, B("settings", "⚙ 설정"), B("hide", "숨기기"), B("quit", "닫기")); sys.Plain = true; gs.Add(sys);
 
             if (S.Mode == 1)

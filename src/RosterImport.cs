@@ -357,6 +357,41 @@ namespace ClassroomHud
             return null;
         }
 
+        // 명렬표 서식(.xlsx) 만들기: 번호·이름·성별·사진 칸
+        public static void WriteTemplate(string path, List<string[]> rows)
+        {
+            Func<string, string> X = t => System.Security.SecurityElement.Escape(t ?? "");
+            Func<int, int, string, int, string> C = (r, c, v, st) => "<c r=\"" + (char)('A' + c) + r + "\" t=\"inlineStr\" s=\"" + st + "\"><is><t>" + X(v) + "</t></is></c>";
+            var sb = new StringBuilder();
+            sb.Append("<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?><worksheet xmlns=\"" + NsMain + "\"><sheetViews><sheetView workbookViewId=\"0\"><pane ySplit=\"1\" topLeftCell=\"A2\" activePane=\"bottomLeft\" state=\"frozen\"/></sheetView></sheetViews>");
+            sb.Append("<cols><col min=\"1\" max=\"1\" width=\"8\" customWidth=\"1\"/><col min=\"2\" max=\"2\" width=\"16\" customWidth=\"1\"/><col min=\"3\" max=\"3\" width=\"10\" customWidth=\"1\"/><col min=\"4\" max=\"4\" width=\"16\" customWidth=\"1\"/><col min=\"6\" max=\"6\" width=\"60\" customWidth=\"1\"/></cols><sheetData>");
+            sb.Append("<row r=\"1\" ht=\"24\" customHeight=\"1\">" + C(1, 0, "번호", 1) + C(1, 1, "이름", 1) + C(1, 2, "성별", 1) + C(1, 3, "사진", 1) + C(1, 5, "※ 성별은 남/여로 적어요. 사진은 엑셀 [삽입 → 그림 → 셀에 배치]로 '사진' 칸에 넣거나, 그 줄 위에 올려 두면 돼요.", 2) + "</row>");
+            for (int i = 0; i < rows.Count; i++)
+            {
+                int r = i + 2;
+                sb.Append("<row r=\"" + r + "\" ht=\"60\" customHeight=\"1\"><c r=\"A" + r + "\" s=\"3\"><v>" + X(rows[i][0]) + "</v></c>" + C(r, 1, rows[i][1], 3) + C(r, 2, rows[i][2], 3) + C(r, 3, "", 3) + "</row>");
+            }
+            sb.Append("</sheetData><dataValidations count=\"1\"><dataValidation type=\"list\" allowBlank=\"1\" sqref=\"C2:C" + (rows.Count + 1) + "\"><formula1>\"남,여\"</formula1></dataValidation></dataValidations></worksheet>");
+            string styles = "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?><styleSheet xmlns=\"" + NsMain + "\"><fonts count=\"3\"><font><sz val=\"11\"/><name val=\"맑은 고딕\"/></font><font><b/><sz val=\"11\"/><color rgb=\"FFFFFFFF\"/><name val=\"맑은 고딕\"/></font><font><sz val=\"10\"/><color rgb=\"FF7A7F95\"/><name val=\"맑은 고딕\"/></font></fonts>"
+                + "<fills count=\"3\"><fill><patternFill patternType=\"none\"/></fill><fill><patternFill patternType=\"gray125\"/></fill><fill><patternFill patternType=\"solid\"><fgColor rgb=\"FF6C63FF\"/></patternFill></fill></fills>"
+                + "<borders count=\"2\"><border/><border><left style=\"thin\"><color rgb=\"FFD5D8E5\"/></left><right style=\"thin\"><color rgb=\"FFD5D8E5\"/></right><top style=\"thin\"><color rgb=\"FFD5D8E5\"/></top><bottom style=\"thin\"><color rgb=\"FFD5D8E5\"/></bottom></border></borders>"
+                + "<cellStyleXfs count=\"1\"><xf numFmtId=\"0\" fontId=\"0\" fillId=\"0\" borderId=\"0\"/></cellStyleXfs><cellXfs count=\"4\"><xf numFmtId=\"0\" fontId=\"0\" fillId=\"0\" borderId=\"0\" xfId=\"0\"/><xf numFmtId=\"0\" xfId=\"0\" fontId=\"1\" fillId=\"2\" borderId=\"1\" applyFont=\"1\" applyFill=\"1\" applyBorder=\"1\" applyAlignment=\"1\"><alignment horizontal=\"center\" vertical=\"center\"/></xf><xf numFmtId=\"0\" xfId=\"0\" fontId=\"2\" fillId=\"0\" borderId=\"0\" applyFont=\"1\"/><xf numFmtId=\"0\" xfId=\"0\" fontId=\"0\" fillId=\"0\" borderId=\"1\" applyBorder=\"1\" applyAlignment=\"1\"><alignment horizontal=\"center\" vertical=\"center\"/></xf></cellXfs><cellStyles count=\"1\"><cellStyle name=\"Normal\" xfId=\"0\" builtinId=\"0\"/></cellStyles></styleSheet>";
+            var files = new Dictionary<string, string>
+            {
+                { "[Content_Types].xml", "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?><Types xmlns=\"http://schemas.openxmlformats.org/package/2006/content-types\"><Default Extension=\"rels\" ContentType=\"application/vnd.openxmlformats-package.relationships+xml\"/><Default Extension=\"xml\" ContentType=\"application/xml\"/><Override PartName=\"/xl/workbook.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml\"/><Override PartName=\"/xl/worksheets/sheet1.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml\"/><Override PartName=\"/xl/styles.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml\"/></Types>" },
+                { "_rels/.rels", "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?><Relationships xmlns=\"" + NsPkg + "\"><Relationship Id=\"rId1\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument\" Target=\"xl/workbook.xml\"/></Relationships>" },
+                { "xl/workbook.xml", "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?><workbook xmlns=\"" + NsMain + "\" xmlns:r=\"" + NsRel + "\"><sheets><sheet name=\"명렬표\" sheetId=\"1\" r:id=\"rId1\"/></sheets></workbook>" },
+                { "xl/_rels/workbook.xml.rels", "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?><Relationships xmlns=\"" + NsPkg + "\"><Relationship Id=\"rId1\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet\" Target=\"worksheets/sheet1.xml\"/><Relationship Id=\"rId2\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles\" Target=\"styles.xml\"/></Relationships>" },
+                { "xl/worksheets/sheet1.xml", sb.ToString() },
+                { "xl/styles.xml", styles },
+            };
+            if (File.Exists(path)) File.Delete(path);
+            using (var fs = File.Create(path))
+            using (var z = new ZipArchive(fs, ZipArchiveMode.Create))
+                foreach (var kv in files)
+                    using (var w = new StreamWriter(z.CreateEntry(kv.Key).Open(), new UTF8Encoding(false))) w.Write(kv.Value);
+        }
+
         // 사진 여러 장: 파일 이름에 들어 있는 이름이나 번호로 학생 찾기
         public static int MatchPhoto(string file, IList<string> names)
         {

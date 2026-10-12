@@ -148,6 +148,8 @@ namespace ClassroomHud
         public Dictionary<string, Rule> Rules { get; set; }
         public List<Msg> Messages { get; set; }
         public List<QuickLink> Links { get; set; }
+        public List<string> Tools { get; set; }       // 시계 아래 [교실 도구]에 보일 버튼
+        public static readonly string[][] ToolList = { new[] { "msgs", "선생님 안내" }, new[] { "pick", "뽑기" }, new[] { "memo", "텍스트" }, new[] { "week", "이번 주" } };
         public static List<QuickLink> DefaultLinks()
         {
             return new List<QuickLink> { new QuickLink("아이스크림", "https://www.i-scream.co.kr"), new QuickLink("유튜브", "https://www.youtube.com") };
@@ -225,6 +227,7 @@ namespace ClassroomHud
             foreach (var k in RuleKeys) if (!Rules.ContainsKey(k) || Rules[k] == null) Rules[k] = dr[k];
             if (Messages == null) Messages = DefaultMessages();
             if (Links == null) Links = DefaultLinks();
+            if (Tools == null) Tools = new List<string> { "pick", "memo" };   // 처음에는 뽑기·텍스트만
             if (Scale <= 0.1f || float.IsNaN(Scale)) Scale = 1f;
             if (Mode < 0 || Mode > 2) Mode = 0;
             if (string.IsNullOrEmpty(Color)) Color = "#1F5FFF";

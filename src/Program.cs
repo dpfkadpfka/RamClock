@@ -35,6 +35,11 @@ namespace ClassroomHud
         {
             if (args.Length == 0 || args[0] != "--shots") DpiAware();
             if (args.Length >= 2 && args[0] == "--render-test") { RenderTest(args[1]); return; }
+            if (args.Length >= 2 && args[0] == "--tpl")
+            {
+                RosterImport.WriteTemplate(args[1], new List<string[]> { new[] { "1", "김하늘", "여" }, new[] { "2", "이도윤", "남" }, new[] { "3", "", "" } });
+                return;
+            }
             if (args.Length >= 1 && args[0] == "--times")
             {
                 foreach (var t in new[] { "0945", "945", "9", "09:45", "9시45분", "9시", "오후 1:30", "1330", "25:00", "abc" }) Console.WriteLine(t + " -> " + Sched.ToMin(t) + " " + (Sched.ToMin(t) >= 0 ? Sched.FromMin(Sched.ToMin(t)) : "X"));

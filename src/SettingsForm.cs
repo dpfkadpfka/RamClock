@@ -124,6 +124,43 @@ namespace ClassroomHud
             return c;
         }
         static DataGridViewCheckBoxColumn CheckCol(string h, float w) { return new DataGridViewCheckBoxColumn { HeaderText = h, FillWeight = w }; }
+
+        // 맨 앞 체크 칸 (삭제할 줄 고르기) — 칸 번호는 그대로 두고 화면에서만 맨 앞에
+        static void AddSelectCol(DataGridView g)
+        {
+            var c = new DataGridViewCheckBoxColumn { Name = "sel", HeaderText = "✓", FillWeight = 6, MinimumWidth = 34 };
+            g.Columns.Add(c);
+            c.DisplayIndex = 0;
+            // 창이 만들어질 때 한 번 더 (일부 환경에서 순서가 되돌아가는 것 방지)
+            g.HandleCreated += (o, e) => { try { c.DisplayIndex = 0; } catch { } };
+            g.VisibleChanged += (o, e) => { try { if (g.Visible && c.DisplayIndex != 0) c.DisplayIndex = 0; } catch { } };
+            g.CurrentCellDirtyStateChanged += (o, e) => { if (g.CurrentCell != null && g.CurrentCell.OwningColumn == c && g.IsCurrentCellDirty) g.CommitEdit(DataGridViewDataErrorContexts.Commit); };
+        }
+
+        bool DeleteChecked(DataGridView g)
+        {
+            g.EndEdit();
+            var col = g.Columns["sel"]; if (col == null) return false;
+            var del = new List<DataGridViewRow>();
+            foreach (DataGridViewRow r in g.Rows) if (r.Cells[col.Index].Value is bool && (bool)r.Cells[col.Index].Value) del.Add(r);
+            if (del.Count == 0) { MessageBox.Show(this, "지울 줄의 맨 앞 칸(✓)을 먼저 체크해 주세요.", "RamClock", MessageBoxButtons.OK, MessageBoxIcon.Information); return false; }
+            foreach (var r in del) g.Rows.Remove(r);
+            return true;
+        }
+
+        static void MoveGrid(DataGridView g, int d)
+        {
+            g.EndEdit();
+            int r = CurRow(g), t = r + d;
+            if (r < 0 || t < 0 || t >= g.Rows.Count) return;
+            int ci = g.CurrentCell != null ? g.CurrentCell.ColumnIndex : 0;
+            var row = g.Rows[r]; g.Rows.RemoveAt(r); g.Rows.Insert(t, row);
+            g.CurrentCell = g.Rows[t].Cells[ci];
+        }
+
+        bool AskReset(string what) { return MessageBox.Show(this, what + "\n지금 적어 둔 내용은 사라져요. 계속할까요?", "RamClock", MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes; }
+
+        static Button Arrow(string t, string tip) { var b = new GButton { Text = t, AutoSize = false, Size = new Size(40, 36), Margin = new Padding(0, 2, 6, 2) }; new ToolTip().SetToolTip(b, tip); return b; }
         static DataGridViewComboBoxColumn ComboCol(string h, float w, params string[] items)
         {
             var c = new DataGridViewComboBoxColumn { HeaderText = h, FillWeight = w, DisplayStyle = DataGridViewComboBoxDisplayStyle.DropDownButton, FlatStyle = FlatStyle.Flat };
@@ -609,6 +646,7 @@ namespace ClassroomHud
             gSched.Columns.Add(TextCol("이름", 16, true));
             gSched.Columns.Add(TextCol("시작 (예: 09:00)", 27));
             gSched.Columns.Add(TextCol("끝 (예: 09:40)", 27));
+            AddSelectCol(gSched);
             gSched.CellValueChanged += (o, e) => { if (!loading && e.ColumnIndex == 0) Renumber(); };
             // 0945, 945, 9시45분처럼 써도 09:45로 바꿔 주기
             gSched.CellEndEdit += (o, e) =>
@@ -621,15 +659,15 @@ namespace ClassroomHud
             };
 
             var bar = Flow();
-            bAdd = B("+ 추가"); bDel = B("선택 줄 삭제"); bUp = B("위로"); bDown = B("아래로"); bReset = B("기본값으로");
+            bAdd = B("+ 추가"); bDel = B("✓ 체크한 줄 삭제"); bUp = Arrow("▲", "고른 줄을 위로"); bDown = Arrow("▼", "고른 줄을 아래로"); bReset = B("처음 시정표로 되돌리기");
             bar.Controls.AddRange(new Control[] { bAdd, bDel, bUp, bDown, bReset });
             lSchedNote = Note("");
 
             bAdd.Click += (o, e) => AddSchedRow();
-            bDel.Click += (o, e) => { var r = CurRow(gSched); if (r >= 0) { gSched.Rows.RemoveAt(r); Renumber(); } };
+            bDel.Click += (o, e) => { if (DeleteChecked(gSched)) Renumber(); };
             bUp.Click += (o, e) => MoveRow(-1);
             bDown.Click += (o, e) => MoveRow(1);
-            bReset.Click += (o, e) => FillSchedGrid(schedDay == 0 ? Settings.DefaultSchedule() : ClonePeriods(R.Schedule));
+            bReset.Click += (o, e) => { if (AskReset(schedDay == 0 ? "프로그램에 처음 들어 있던 시정표로 되돌려요." : "이 요일 시정표를 기본 시정표와 똑같이 되돌려요.")) FillSchedGrid(schedDay == 0 ? Settings.DefaultSchedule() : ClonePeriods(R.Schedule)); };
             cbSchedDay.SelectedIndexChanged += (o, e) =>
             {
                 if (loading) return;
@@ -676,7 +714,7 @@ namespace ClassroomHud
             gSched.ReadOnly = !ed;
             gSched.DefaultCellStyle.ForeColor = ed ? SystemColors.ControlText : Color.Gray;
             foreach (var b in new[] { bAdd, bDel, bUp, bDown, bReset }) b.Enabled = ed;
-            bReset.Text = schedDay == 0 ? "기본값으로" : "기본 시정표 복사";
+            bReset.Text = schedDay == 0 ? "처음 시정표로 되돌리기" : "기본 시정표와 똑같이";
             lSchedNote.Text = !ed ? DayKo[schedDay] + "요일은 지금 기본 시정표를 따라요. 위 칸을 체크하면 이 요일만 따로 정할 수 있어요. (예: 수요일 5교시까지)"
                                  : "교시, 쉬는 시간, 점심시간을 줄마다 정해요. 시간은 24시간 형식(오후 1시 = 13:00)으로 적고, 교시 번호는 순서대로 자동으로 붙어요.";
         }
@@ -865,6 +903,7 @@ namespace ClassroomHud
             gMsgs.Columns.Add(BtnCol("소리…", 9));
             gMsgs.Columns.Add(BtnCol("이미지…", 10));
             gMsgs.Columns.Add(BtnCol("테스트", 9));
+            AddSelectCol(gMsgs);
             foreach (var m in R.Messages) AddMsgRow(m.Label, m.Text, m.Sound, m.Image);
             gMsgs.CellContentClick += (o, e) =>
             {
@@ -885,11 +924,12 @@ namespace ClassroomHud
                 else if (e.ColumnIndex == 6) Audio.Announce(row.Cells[1].Value as string, tag.Sound, 1, true, true);
             };
             var bar = Flow();
-            var bA = B("+ 안내 버튼 추가"); var bD = B("선택 줄 삭제"); var bR = B("기본 안내로");
+            var bA = B("+ 안내 버튼 추가"); var bD = B("✓ 체크한 줄 삭제"); var bMu = Arrow("▲", "고른 줄을 위로"); var bMd = Arrow("▼", "고른 줄을 아래로"); var bR = B("처음 안내로 되돌리기");
             bA.Click += (o, e) => { int i = AddMsgRow("새 안내", "안내 문구를 입력해 주세요.", "", ""); gMsgs.CurrentCell = gMsgs.Rows[i].Cells[0]; };
-            bD.Click += (o, e) => { int r = CurRow(gMsgs); if (r >= 0) gMsgs.Rows.RemoveAt(r); };
-            bR.Click += (o, e) => { gMsgs.Rows.Clear(); foreach (var m in Settings.DefaultMessages()) AddMsgRow(m.Label, m.Text, "", ""); };
-            bar.Controls.AddRange(new Control[] { bA, bD, bR });
+            bD.Click += (o, e) => DeleteChecked(gMsgs);
+            bMu.Click += (o, e) => MoveGrid(gMsgs, -1); bMd.Click += (o, e) => MoveGrid(gMsgs, 1);
+            bR.Click += (o, e) => { if (!AskReset("프로그램에 처음 들어 있던 안내 버튼들로 되돌려요.")) return; gMsgs.Rows.Clear(); foreach (var m in Settings.DefaultMessages()) AddMsgRow(m.Label, m.Text, "", ""); };
+            bar.Controls.AddRange(new Control[] { bA, bD, bMu, bMd, bR });
             var note = Note("위젯의 [선생님 안내]를 누르면 나오는 버튼이에요. 이미지를 넣으면 안내할 때 크게 보여 줘요(PNG·JPG·움직이는 GIF). 소리를 넣지 않으면 안내 문구를 읽어 줘요.");
             Page("선생님 안내", new Control[] { gMsgs, bar, note }, new float[] { 100, 0, 0 });
         }
@@ -960,6 +1000,8 @@ namespace ClassroomHud
             var bar = Flow();
             var bXl = B("엑셀로 명단 넣기…"); bXl.Tag = "primary";
             bXl.Click += (o, e) => ImportRoster();
+            var bTpl = B("엑셀 서식 받기…");
+            bTpl.Click += (o, e) => SaveRosterTemplate();
             var bPhotos = B("사진 한꺼번에 넣기…");
             bPhotos.Click += (o, e) => ImportPhotos();
             var bPaste = B("붙여 넣기…");
@@ -969,7 +1011,7 @@ namespace ClassroomHud
             lPicked = new Label { AutoSize = true, Margin = new Padding(16, 9, 6, 3), ForeColor = Color.DimGray };
             var bReset = B("뽑힌 기록 지우기");
             bReset.Click += (o, e) => { R.Picked.Clear(); UpdatePicked(); };
-            bar.Controls.AddRange(new Control[] { bXl, bPhotos, bPaste, bClear, lPicked, bReset });
+            bar.Controls.AddRange(new Control[] { bTpl, bXl, bPhotos, bPaste, bClear, lPicked, bReset });
             UpdatePicked();
             var note = Note("[엑셀로 명단 넣기]는 나이스 명렬표처럼 번호·성명·성별 열이 있는 파일을 그대로 읽어요. 엑셀 칸에 사진을 넣어 두면 사진도 함께 들어가요. 사진 파일만 따로 있으면 [사진 한꺼번에 넣기]로 여러 장을 고르세요(파일 이름에 이름이나 번호). 이름을 비워 두면 번호로 뽑아요. 성별을 정해 두면 뽑기 창에서 [남자만]·[여자만]으로 뽑을 수 있어요. 프로필 사진을 넣으면 뽑힐 때 사진도 함께 나와요. 위젯의 [뽑기]를 누르면 시작해요.");
             Page("뽑기", new Control[] { top, gStu, bar, note }, new float[] { 0, 100, 0, 0 });
@@ -996,6 +1038,28 @@ namespace ClassroomHud
                 var st = R.StudentOf(no);
                 int i = gStu.Rows.Add(no + "번", st != null ? st.Name : "", GenderText(st != null ? st.Gender : ""), ImageText(st != null ? st.Photo : ""));
                 gStu.Rows[i].Tag = st != null ? st.Photo ?? "" : "";
+            }
+        }
+
+        void SaveRosterTemplate()
+        {
+            gStu.EndEdit();
+            using (var sd = new SaveFileDialog { Filter = "엑셀 파일|*.xlsx", FileName = "RamClock 명렬표 서식.xlsx", Title = "명렬표 서식 저장" })
+            {
+                if (sd.ShowDialog(this) != DialogResult.OK) return;
+                var rows = new List<string[]>();
+                for (int i = 0; i < gStu.Rows.Count; i++)
+                {
+                    var r = gStu.Rows[i];
+                    string g = r.Cells[2].Value as string; if (g != "남" && g != "여") g = "";
+                    rows.Add(new[] { (i + 1).ToString(), (r.Cells[1].Value as string ?? "").Trim(), g });
+                }
+                try
+                {
+                    RosterImport.WriteTemplate(sd.FileName, rows);
+                    try { System.Diagnostics.Process.Start(sd.FileName); } catch { }
+                }
+                catch (Exception ex) { MessageBox.Show(this, "저장하지 못했어요.\n" + ex.Message, "RamClock"); }
             }
         }
 
@@ -1138,6 +1202,7 @@ namespace ClassroomHud
             gLinks.Columns.Add(TextCol("버튼 이름", 25));
             gLinks.Columns.Add(TextCol("주소 (사이트 주소나 파일·폴더 위치)", 60));
             gLinks.Columns.Add(BtnCol("열어 보기", 12));
+            AddSelectCol(gLinks);
             foreach (var l in R.Links) gLinks.Rows.Add(l.Name, l.Url);
             gLinks.CellContentClick += (o, e) =>
             {
@@ -1149,28 +1214,34 @@ namespace ClassroomHud
                 try { System.Diagnostics.Process.Start(u); } catch { MessageBox.Show(this, "열지 못했어요. 주소를 확인해 주세요.", "RamClock"); }
             };
             var bar = Flow();
-            var bA = B("+ 사이트 추가"); var bF = B("+ 파일·프로그램 추가…"); var bD = B("선택 줄 삭제"); var bUp = B("▲ 위로"); var bR = B("기본으로");
-            bA.Click += (o, e) => { int i = gLinks.Rows.Add("새 사이트", "https://"); gLinks.CurrentCell = gLinks.Rows[i].Cells[0]; gLinks.BeginEdit(true); };
-            bF.Click += (o, e) =>
+            var bA = B("+ 사이트 추가…"); bA.Tag = "primary"; var bD = B("✓ 체크한 줄 삭제"); var bUp = Arrow("▲", "고른 줄을 앞으로"); var bDn = Arrow("▼", "고른 줄을 뒤로"); var bR = B("처음 상태로 되돌리기");
+            bA.Click += (o, e) => { using (var d = new LinkDialog(null)) if (d.ShowDialog(this) == DialogResult.OK) AddLinkRow(d.Result); };
+            bD.Click += (o, e) => DeleteChecked(gLinks);
+            bUp.Click += (o, e) => MoveGrid(gLinks, -1); bDn.Click += (o, e) => MoveGrid(gLinks, 1);
+            bR.Click += (o, e) => { if (!AskReset("처음 들어 있던 바로가기(아이스크림·유튜브)로 되돌려요.")) return; gLinks.Rows.Clear(); foreach (var l in Settings.DefaultLinks()) gLinks.Rows.Add(l.Name, l.Url); };
+            bar.Controls.AddRange(new Control[] { bA, bD, bUp, bDn, bR });
+            var note = Note("시계에 마우스를 올리면 시계 위쪽에 로고 버튼으로 나타나요. 누르면 기본 브라우저(또는 그 파일·프로그램)로 열려요. 이름·주소 칸은 눌러서 바로 고칠 수 있어요.");
+
+            // 교실 도구 버튼 고르기
+            var tools = Flow();
+            tools.Controls.Add(new Label { Text = "시계 아래 [교실 도구]에 보일 버튼:", AutoSize = true, Margin = new Padding(3, 9, 12, 3) });
+            toolChecks = new List<CheckBox>();
+            foreach (var t in Settings.ToolList)
             {
-                using (var od = new OpenFileDialog { Title = "자주 여는 파일이나 프로그램 고르기", Filter = "모든 파일|*.*" })
-                    if (od.ShowDialog(this) == DialogResult.OK) gLinks.Rows.Add(Path.GetFileNameWithoutExtension(od.FileName), od.FileName);
-            };
-            bD.Click += (o, e) => { int r = CurRow(gLinks); if (r >= 0) gLinks.Rows.RemoveAt(r); };
-            bUp.Click += (o, e) =>
-            {
-                int r = CurRow(gLinks); if (r <= 0) return;
-                var row = gLinks.Rows[r]; gLinks.Rows.RemoveAt(r); gLinks.Rows.Insert(r - 1, row); gLinks.CurrentCell = gLinks.Rows[r - 1].Cells[0];
-            };
-            bR.Click += (o, e) => { gLinks.Rows.Clear(); foreach (var l in Settings.DefaultLinks()) gLinks.Rows.Add(l.Name, l.Url); };
-            bar.Controls.AddRange(new Control[] { bA, bF, bD, bUp, bR });
-            var note = Note("시계에 마우스를 올리면 시계 위쪽에 이 버튼들이 나타나요. 누르면 기본 브라우저(또는 그 파일·프로그램)로 열려요. 평소에는 보이지 않아요.");
-            Page("바로가기", new Control[] { gLinks, bar, note }, new float[] { 100, 0, 0 });
+                var tg = new Toggle { Text = t[1], Tag = t[0], AutoSize = true, Checked = R.Tools.Contains(t[0]), Margin = new Padding(0, 6, 16, 3) };
+                toolChecks.Add(tg); tools.Controls.Add(tg);
+            }
+            var lLinks = new Label { Text = "자주 가는 사이트", AutoSize = true, Font = Media.UiFont(10.5F, true), Margin = new Padding(3, 14, 3, 4) };
+            Page("메뉴·바로가기", new Control[] { tools, lLinks, gLinks, bar, note }, new float[] { 0, 0, 100, 0, 0 });
         }
+
+        List<CheckBox> toolChecks;
+        public void AddLinkRow(QuickLink l) { if (gLinks == null || l == null) return; int i = gLinks.Rows.Add(l.Name, l.Url); gLinks.CurrentCell = gLinks.Rows[i].Cells[0]; }
 
         void CommitLinks()
         {
             gLinks.EndEdit();
+            if (toolChecks != null) { R.Tools = new List<string>(); foreach (var c in toolChecks) if (c.Checked) R.Tools.Add((string)c.Tag); }
             R.Links = new List<QuickLink>();
             foreach (DataGridViewRow row in gLinks.Rows)
             {
