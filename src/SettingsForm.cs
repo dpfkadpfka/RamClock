@@ -125,27 +125,18 @@ namespace ClassroomHud
         }
         static DataGridViewCheckBoxColumn CheckCol(string h, float w) { return new DataGridViewCheckBoxColumn { HeaderText = h, FillWeight = w }; }
 
-        // 맨 앞 체크 칸 (삭제할 줄 고르기) — 칸 번호는 그대로 두고 화면에서만 맨 앞에
-        static void AddSelectCol(DataGridView g)
+        // 줄마다 맨 오른쪽 ✕ 버튼: 누르면 그 줄 삭제
+        static void AddDeleteCol(DataGridView g, Action after)
         {
-            var c = new DataGridViewCheckBoxColumn { Name = "sel", HeaderText = "✓", FillWeight = 6, MinimumWidth = 34 };
+            var c = new DataGridViewButtonColumn { Name = "del", HeaderText = "", Text = "✕", UseColumnTextForButtonValue = true, FillWeight = 5, MinimumWidth = 38 };
             g.Columns.Add(c);
-            c.DisplayIndex = 0;
-            // 창이 만들어질 때 한 번 더 (일부 환경에서 순서가 되돌아가는 것 방지)
-            g.HandleCreated += (o, e) => { try { c.DisplayIndex = 0; } catch { } };
-            g.VisibleChanged += (o, e) => { try { if (g.Visible && c.DisplayIndex != 0) c.DisplayIndex = 0; } catch { } };
-            g.CurrentCellDirtyStateChanged += (o, e) => { if (g.CurrentCell != null && g.CurrentCell.OwningColumn == c && g.IsCurrentCellDirty) g.CommitEdit(DataGridViewDataErrorContexts.Commit); };
-        }
-
-        bool DeleteChecked(DataGridView g)
-        {
-            g.EndEdit();
-            var col = g.Columns["sel"]; if (col == null) return false;
-            var del = new List<DataGridViewRow>();
-            foreach (DataGridViewRow r in g.Rows) if (r.Cells[col.Index].Value is bool && (bool)r.Cells[col.Index].Value) del.Add(r);
-            if (del.Count == 0) { MessageBox.Show(this, "지울 줄의 맨 앞 칸(✓)을 먼저 체크해 주세요.", "RamClock", MessageBoxButtons.OK, MessageBoxIcon.Information); return false; }
-            foreach (var r in del) g.Rows.Remove(r);
-            return true;
+            g.CellContentClick += (o, e) =>
+            {
+                if (e.RowIndex < 0 || e.ColumnIndex != c.Index || g.ReadOnly) return;
+                g.EndEdit();
+                g.Rows.RemoveAt(e.RowIndex);
+                if (after != null) after();
+            };
         }
 
         static void MoveGrid(DataGridView g, int d)
@@ -646,7 +637,7 @@ namespace ClassroomHud
             gSched.Columns.Add(TextCol("이름", 16, true));
             gSched.Columns.Add(TextCol("시작 (예: 09:00)", 27));
             gSched.Columns.Add(TextCol("끝 (예: 09:40)", 27));
-            AddSelectCol(gSched);
+            AddDeleteCol(gSched, () => Renumber());
             gSched.CellValueChanged += (o, e) => { if (!loading && e.ColumnIndex == 0) Renumber(); };
             // 0945, 945, 9시45분처럼 써도 09:45로 바꿔 주기
             gSched.CellEndEdit += (o, e) =>
@@ -659,12 +650,11 @@ namespace ClassroomHud
             };
 
             var bar = Flow();
-            bAdd = B("+ 추가"); bDel = B("✓ 체크한 줄 삭제"); bUp = Arrow("▲", "고른 줄을 위로"); bDown = Arrow("▼", "고른 줄을 아래로"); bReset = B("처음 시정표로 되돌리기");
-            bar.Controls.AddRange(new Control[] { bAdd, bDel, bUp, bDown, bReset });
+            bAdd = B("+ 추가"); bUp = Arrow("▲", "고른 줄을 위로"); bDown = Arrow("▼", "고른 줄을 아래로"); bReset = B("처음 시정표로 되돌리기");
+            bar.Controls.AddRange(new Control[] { bAdd, bUp, bDown, bReset });
             lSchedNote = Note("");
 
             bAdd.Click += (o, e) => AddSchedRow();
-            bDel.Click += (o, e) => { if (DeleteChecked(gSched)) Renumber(); };
             bUp.Click += (o, e) => MoveRow(-1);
             bDown.Click += (o, e) => MoveRow(1);
             bReset.Click += (o, e) => { if (AskReset(schedDay == 0 ? "프로그램에 처음 들어 있던 시정표로 되돌려요." : "이 요일 시정표를 기본 시정표와 똑같이 되돌려요.")) FillSchedGrid(schedDay == 0 ? Settings.DefaultSchedule() : ClonePeriods(R.Schedule)); };
@@ -713,7 +703,7 @@ namespace ClassroomHud
             bool ed = SchedEditable;
             gSched.ReadOnly = !ed;
             gSched.DefaultCellStyle.ForeColor = ed ? SystemColors.ControlText : Color.Gray;
-            foreach (var b in new[] { bAdd, bDel, bUp, bDown, bReset }) b.Enabled = ed;
+            foreach (var b in new[] { bAdd, bUp, bDown, bReset }) b.Enabled = ed;
             bReset.Text = schedDay == 0 ? "처음 시정표로 되돌리기" : "기본 시정표와 똑같이";
             lSchedNote.Text = !ed ? DayKo[schedDay] + "요일은 지금 기본 시정표를 따라요. 위 칸을 체크하면 이 요일만 따로 정할 수 있어요. (예: 수요일 5교시까지)"
                                  : "교시, 쉬는 시간, 점심시간을 줄마다 정해요. 시간은 24시간 형식(오후 1시 = 13:00)으로 적고, 교시 번호는 순서대로 자동으로 붙어요.";
@@ -903,7 +893,7 @@ namespace ClassroomHud
             gMsgs.Columns.Add(BtnCol("소리…", 9));
             gMsgs.Columns.Add(BtnCol("이미지…", 10));
             gMsgs.Columns.Add(BtnCol("테스트", 9));
-            AddSelectCol(gMsgs);
+            AddDeleteCol(gMsgs, null);
             foreach (var m in R.Messages) AddMsgRow(m.Label, m.Text, m.Sound, m.Image);
             gMsgs.CellContentClick += (o, e) =>
             {
@@ -924,12 +914,11 @@ namespace ClassroomHud
                 else if (e.ColumnIndex == 6) Audio.Announce(row.Cells[1].Value as string, tag.Sound, 1, true, true);
             };
             var bar = Flow();
-            var bA = B("+ 안내 버튼 추가"); var bD = B("✓ 체크한 줄 삭제"); var bMu = Arrow("▲", "고른 줄을 위로"); var bMd = Arrow("▼", "고른 줄을 아래로"); var bR = B("처음 안내로 되돌리기");
+            var bA = B("+ 안내 버튼 추가"); var bMu = Arrow("▲", "고른 줄을 위로"); var bMd = Arrow("▼", "고른 줄을 아래로"); var bR = B("처음 안내로 되돌리기");
             bA.Click += (o, e) => { int i = AddMsgRow("새 안내", "안내 문구를 입력해 주세요.", "", ""); gMsgs.CurrentCell = gMsgs.Rows[i].Cells[0]; };
-            bD.Click += (o, e) => DeleteChecked(gMsgs);
             bMu.Click += (o, e) => MoveGrid(gMsgs, -1); bMd.Click += (o, e) => MoveGrid(gMsgs, 1);
             bR.Click += (o, e) => { if (!AskReset("프로그램에 처음 들어 있던 안내 버튼들로 되돌려요.")) return; gMsgs.Rows.Clear(); foreach (var m in Settings.DefaultMessages()) AddMsgRow(m.Label, m.Text, "", ""); };
-            bar.Controls.AddRange(new Control[] { bA, bD, bMu, bMd, bR });
+            bar.Controls.AddRange(new Control[] { bA, bMu, bMd, bR });
             var note = Note("위젯의 [선생님 안내]를 누르면 나오는 버튼이에요. 이미지를 넣으면 안내할 때 크게 보여 줘요(PNG·JPG·움직이는 GIF). 소리를 넣지 않으면 안내 문구를 읽어 줘요.");
             Page("선생님 안내", new Control[] { gMsgs, bar, note }, new float[] { 100, 0, 0 });
         }
@@ -1202,7 +1191,7 @@ namespace ClassroomHud
             gLinks.Columns.Add(TextCol("버튼 이름", 25));
             gLinks.Columns.Add(TextCol("주소 (사이트 주소나 파일·폴더 위치)", 60));
             gLinks.Columns.Add(BtnCol("열어 보기", 12));
-            AddSelectCol(gLinks);
+            AddDeleteCol(gLinks, null);
             foreach (var l in R.Links) gLinks.Rows.Add(l.Name, l.Url);
             gLinks.CellContentClick += (o, e) =>
             {
@@ -1214,12 +1203,11 @@ namespace ClassroomHud
                 try { System.Diagnostics.Process.Start(u); } catch { MessageBox.Show(this, "열지 못했어요. 주소를 확인해 주세요.", "RamClock"); }
             };
             var bar = Flow();
-            var bA = B("+ 사이트 추가…"); bA.Tag = "primary"; var bD = B("✓ 체크한 줄 삭제"); var bUp = Arrow("▲", "고른 줄을 앞으로"); var bDn = Arrow("▼", "고른 줄을 뒤로"); var bR = B("처음 상태로 되돌리기");
+            var bA = B("+ 사이트 추가…"); bA.Tag = "primary"; var bUp = Arrow("▲", "고른 줄을 앞으로"); var bDn = Arrow("▼", "고른 줄을 뒤로"); var bR = B("처음 상태로 되돌리기");
             bA.Click += (o, e) => { using (var d = new LinkDialog(null)) if (d.ShowDialog(this) == DialogResult.OK) AddLinkRow(d.Result); };
-            bD.Click += (o, e) => DeleteChecked(gLinks);
             bUp.Click += (o, e) => MoveGrid(gLinks, -1); bDn.Click += (o, e) => MoveGrid(gLinks, 1);
             bR.Click += (o, e) => { if (!AskReset("처음 들어 있던 바로가기(아이스크림·유튜브)로 되돌려요.")) return; gLinks.Rows.Clear(); foreach (var l in Settings.DefaultLinks()) gLinks.Rows.Add(l.Name, l.Url); };
-            bar.Controls.AddRange(new Control[] { bA, bD, bUp, bDn, bR });
+            bar.Controls.AddRange(new Control[] { bA, bUp, bDn, bR });
             var note = Note("시계에 마우스를 올리면 시계 위쪽에 로고 버튼으로 나타나요. 누르면 기본 브라우저(또는 그 파일·프로그램)로 열려요. 이름·주소 칸은 눌러서 바로 고칠 수 있어요.");
 
             // 교실 도구 버튼 고르기
