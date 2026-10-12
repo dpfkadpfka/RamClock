@@ -12,7 +12,7 @@ namespace ClassroomHud
     public static class Updater
     {
         public const string Repo = "dpfkadpfka/RamClock";
-        public const string Version = "1.0.1";   // 릴리스 때 태그 번호로 바뀜
+        public const string Version = "1.0.2";   // 릴리스 때 태그 번호로 바뀜
         public static Action<string> Ready;      // 새 버전 받아 둠 → 알림
 
         static string Exe { get { return Application.ExecutablePath; } }
@@ -50,8 +50,36 @@ namespace ClassroomHud
             return false;
         }
 
-        static void Check()
+        // 메뉴의 [업데이트 확인]: 결과를 글로 알려 준다
+        public static void CheckNow(Action<string> report)
         {
+            new Thread(() =>
+            {
+                string msg;
+                try
+                {
+                    if (Pending != null) msg = "새 버전 v" + Pending + "을 이미 받아 두었어요. [지금 업데이트]를 누르거나 다시 켜면 바뀌어요.";
+                    else
+                    {
+                        string r = Check();
+                        msg = r == null ? "지금 쓰는 v" + Version + "이 최신 버전이에요." : "새 버전 v" + r + "을 받았어요. [지금 업데이트]를 누르면 바로 바뀌어요.";
+                    }
+                }
+                catch (Exception ex) { Program.Log(ex); msg = "업데이트를 확인하지 못했어요. 인터넷 연결을 확인해 주세요."; }
+                if (report != null) report(msg);
+            }) { IsBackground = true }.Start();
+        }
+
+        // 새 버전을 받아 바꿔 두면 그 버전 번호, 없으면 null
+        static readonly object gate = new object();
+        static string Check()
+        {
+            lock (gate) return CheckCore();
+        }
+
+        static string CheckCore()
+        {
+            if (Pending != null) return Pending;
             ServicePointManager.SecurityProtocol |= (SecurityProtocolType)3072;
             string json;
             using (var wc = new WebClient())
@@ -61,16 +89,16 @@ namespace ClassroomHud
                 json = wc.DownloadString("https://api.github.com/repos/" + Repo + "/releases/latest");
             }
             var tag = Regex.Match(json, "\"tag_name\"\\s*:\\s*\"([^\"]+)\"").Groups[1].Value;
-            if (tag.Length == 0 || !Newer(tag, Version)) return;
+            if (tag.Length == 0 || !Newer(tag, Version)) return null;
             var url = Regex.Match(json, "\"browser_download_url\"\\s*:\\s*\"([^\"]+RamClock\\.exe)\"").Groups[1].Value;
-            if (url.Length == 0) return;
+            if (url.Length == 0) return null;
 
             string dir = Path.GetDirectoryName(Exe), tmp = Path.Combine(dir, "RamClock.download");
             using (var wc = new WebClient()) { wc.Headers[HttpRequestHeader.UserAgent] = "RamClock"; wc.DownloadFile(url, tmp); }
             var fi = new FileInfo(tmp);
             byte[] head = new byte[2];
             using (var fs = File.OpenRead(tmp)) fs.Read(head, 0, 2);
-            if (fi.Length < 500000 || head[0] != 'M' || head[1] != 'Z') { File.Delete(tmp); return; }
+            if (fi.Length < 500000 || head[0] != 'M' || head[1] != 'Z') { File.Delete(tmp); return null; }
             // 실행 중인 파일은 이름은 바꿀 수 있어서: 지금 것 → .old, 새것 → 원래 이름
             if (File.Exists(OldExe)) File.Delete(OldExe);
             File.Move(Exe, OldExe);
@@ -78,6 +106,7 @@ namespace ClassroomHud
             catch { File.Move(OldExe, Exe); throw; }
             Pending = tag.TrimStart('v', 'V');
             var r = Ready; if (r != null) r(Pending);
+            return Pending;
         }
 
         // 바로 새 버전으로 다시 켜기
