@@ -74,7 +74,7 @@ namespace ClassroomHud
             t.Controls.Add(grid);
 
             var bottom = new FlowLayoutPanel { AutoSize = true, Dock = DockStyle.Fill };
-            var bImport = new GButton { Text = "주간학습안내 PDF 불러오기…", AutoSize = true, MinimumSize = new Size(0, 36), Font = Media.UiFont(10F, true), Tag = "primary" };
+            var bImport = new GButton { Text = "주간학습안내 불러오기 (PDF·한글)…", AutoSize = true, MinimumSize = new Size(0, 36), Font = Media.UiFont(10F, true), Tag = "primary" };
             bPdf = new GButton { Text = "원본 PDF 열기", AutoSize = true, MinimumSize = new Size(0, 36) };
             bClear = new GButton { Text = "이 주 내용 지우기", AutoSize = true, MinimumSize = new Size(0, 36) };
             var bClose = new GButton { Text = "닫기", AutoSize = true, MinimumSize = new Size(90, 36), DialogResult = DialogResult.OK };
@@ -130,7 +130,7 @@ namespace ClassroomHud
             bPdf.Enabled = wp != null && Settings.MediaPath(wp.Pdf) != null;
             bClear.Enabled = wp != null;
             lNote.Text = wp == null
-                ? "이 주는 아직 주간학습안내를 넣지 않았어요. 회색 글씨는 기본 시간표예요. [주간학습안내 PDF 불러오기]를 누르거나 칸을 두 번 눌러 직접 적을 수 있어요."
+                ? "이 주는 아직 주간학습안내를 넣지 않았어요. 회색 글씨는 기본 시간표예요. [주간학습안내 불러오기]를 누르거나, PDF·한글 파일을 이 창에 끌어다 놓거나, 칸을 두 번 눌러 직접 적을 수 있어요."
                 : "칸을 두 번 누르면 과목과 내용을 고칠 수 있어요. 여기 적힌 과목으로 위젯이 이 주에 교시를 안내해요.";
             grid.Rows.Clear();
             int rows = Rows();
@@ -207,15 +207,52 @@ namespace ClassroomHud
             }
         }
 
+        // 파일 끌어다 놓기: 창 어디에 놓아도 된다
+        protected override void OnLoad(EventArgs e)
+        {
+            base.OnLoad(e);
+            EnableDrop(this);
+        }
+        void EnableDrop(Control c)
+        {
+            c.AllowDrop = true;
+            c.DragEnter += (o, e) =>
+            {
+                var f = e.Data.GetDataPresent(DataFormats.FileDrop) ? e.Data.GetData(DataFormats.FileDrop) as string[] : null;
+                e.Effect = f != null && f.Length > 0 && WeekFile(f[0]) ? DragDropEffects.Copy : DragDropEffects.None;
+            };
+            c.DragDrop += (o, e) =>
+            {
+                var f = e.Data.GetData(DataFormats.FileDrop) as string[];
+                if (f != null && f.Length > 0 && WeekFile(f[0])) BeginInvoke(new Action(() => ImportFile(f[0])));
+            };
+            foreach (Control ch in c.Controls) EnableDrop(ch);
+        }
+
         void ImportPdf()
         {
             string path;
-            using (var od = new OpenFileDialog { Filter = "PDF 파일|*.pdf", Title = "주간학습안내 PDF 고르기" })
+            using (var od = new OpenFileDialog { Filter = "주간학습안내 (PDF·한글)|*.pdf;*.hwpx;*.hwp|PDF 파일|*.pdf|한글 파일|*.hwpx;*.hwp", Title = "주간학습안내 파일 고르기" })
             {
                 if (od.ShowDialog(this) != DialogResult.OK) return;
                 path = od.FileName;
             }
+            ImportFile(path);
+        }
+
+        static bool WeekFile(string p) { var e = Path.GetExtension(p ?? "").ToLowerInvariant(); return e == ".pdf" || e == ".hwpx" || e == ".hwp"; }
+
+        void ImportFile(string path)
+        {
             WeekParseResult res;
+            string ext = Path.GetExtension(path).ToLowerInvariant();
+            if (ext == ".hwpx" || ext == ".hwp")
+            {
+                Cursor = Cursors.WaitCursor;
+                try { res = HwpxWeek.Parse(path); } finally { Cursor = Cursors.Default; }
+                FinishImport(path, res);
+                return;
+            }
             try
             {
                 Cursor = Cursors.WaitCursor;
@@ -230,6 +267,11 @@ namespace ClassroomHud
             }
             catch (Exception ex) { res = new WeekParseResult { Message = "PDF를 읽다가 문제가 생겼어요. (" + ex.Message + ")" }; }
             finally { Cursor = Cursors.Default; }
+            FinishImport(path, res);
+        }
+
+        void FinishImport(string path, WeekParseResult res)
+        {
 
             DateTime target = monday;
             if (res.Monday.HasValue && res.Monday.Value != monday)

@@ -35,11 +35,23 @@ namespace ClassroomHud
         {
             if (args.Length == 0 || args[0] != "--shots") DpiAware();
             if (args.Length >= 2 && args[0] == "--render-test") { RenderTest(args[1]); return; }
+            if (args.Length >= 1 && args[0] == "--times")
+            {
+                foreach (var t in new[] { "0945", "945", "9", "09:45", "9시45분", "9시", "오후 1:30", "1330", "25:00", "abc" }) Console.WriteLine(t + " -> " + Sched.ToMin(t) + " " + (Sched.ToMin(t) >= 0 ? Sched.FromMin(Sched.ToMin(t)) : "X"));
+                return;
+            }
             if (args.Length >= 2 && args[0] == "--roster")
             {
                 string m; var rows = RosterImport.Read(args[1], out m);
                 Console.WriteLine("msg: " + m);
                 if (rows != null) foreach (var r in rows) Console.WriteLine(r.No + " " + r.Name + " " + r.Gender + " photo=" + (r.Photo == null ? 0 : r.Photo.Length) + r.PhotoExt);
+                return;
+            }
+            if (args.Length >= 2 && args[0] == "--parse" && (args[1].EndsWith(".hwpx") || args[1].EndsWith(".hwp")))
+            {
+                var hr = HwpxWeek.Parse(args[1]);
+                Console.WriteLine("msg: " + hr.Message + " periods " + hr.Periods + " monday " + hr.Monday);
+                foreach (var kv in hr.Days) { Console.WriteLine("== " + kv.Key); foreach (var c in kv.Value) Console.WriteLine("   [" + c.Subj + "] " + (c.Content ?? "").Replace("\n", " / ")); }
                 return;
             }
             if (args.Length >= 2 && args[0] == "--parse")

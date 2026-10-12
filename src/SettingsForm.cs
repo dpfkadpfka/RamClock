@@ -610,6 +610,15 @@ namespace ClassroomHud
             gSched.Columns.Add(TextCol("시작 (예: 09:00)", 27));
             gSched.Columns.Add(TextCol("끝 (예: 09:40)", 27));
             gSched.CellValueChanged += (o, e) => { if (!loading && e.ColumnIndex == 0) Renumber(); };
+            // 0945, 945, 9시45분처럼 써도 09:45로 바꿔 주기
+            gSched.CellEndEdit += (o, e) =>
+            {
+                if (e.ColumnIndex != 2 && e.ColumnIndex != 3 || e.RowIndex < 0) return;
+                var c = gSched.Rows[e.RowIndex].Cells[e.ColumnIndex];
+                int mm = Sched.ToMin(c.Value as string);
+                if (mm >= 0) { c.Value = Sched.FromMin(mm); c.Style.BackColor = Color.Empty; }
+                else if (!string.IsNullOrWhiteSpace(c.Value as string)) c.Style.BackColor = Color.MistyRose;
+            };
 
             var bar = Flow();
             bAdd = B("+ 추가"); bDel = B("선택 줄 삭제"); bUp = B("위로"); bDown = B("아래로"); bReset = B("기본값으로");

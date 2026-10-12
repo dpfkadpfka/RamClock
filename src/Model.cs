@@ -419,9 +419,17 @@ namespace ClassroomHud
         public static int ToMin(string s)
         {
             if (string.IsNullOrEmpty(s)) return -1;
-            s = s.Trim().Replace('：', ':').Replace('.', ':');
+            s = s.Trim().Replace('：', ':').Replace('.', ':').Replace(" ", "");
+            bool pm = s.StartsWith("오후"), am = s.StartsWith("오전");
+            if (pm || am) s = s.Substring(2);
+            s = s.Replace("시", ":").Replace("분", "").TrimEnd(':');
+            // 숫자만 쓴 경우: 9 → 9:00, 945 → 9:45, 0945 → 09:45
+            if (s.Length > 0 && s.Length <= 4 && System.Text.RegularExpressions.Regex.IsMatch(s, @"^\d+$"))
+                s = s.Length <= 2 ? s + ":00" : s.Substring(0, s.Length - 2) + ":" + s.Substring(s.Length - 2);
             var p = s.Split(':');
             int h, m;
+            if (p.Length == 2 && p[1].Length == 0) p[1] = "0";
+            if (p.Length == 2 && int.TryParse(p[0], out h) && pm && h < 12) p[0] = (h + 12).ToString();
             if (p.Length != 2 || !int.TryParse(p[0], out h) || !int.TryParse(p[1], out m)) return -1;
             if (h < 0 || h > 23 || m < 0 || m > 59) return -1;
             return h * 60 + m;

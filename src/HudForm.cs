@@ -412,6 +412,7 @@ namespace ClassroomHud
                 case "lock": S.Locked = !S.Locked; S.Save(); break;
                 case "settings": OpenSettings(); return;
                 case "hide": HideToTray(); return;
+                case "quit": ExitApp(); return;
                 case "cpick": PickColor(); return;
                 case "tm-":
                 case "tm+":

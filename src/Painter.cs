@@ -500,7 +500,7 @@ namespace ClassroomHud
             var gs = new List<Grp>();
             gs.Add(G("모드", false, B("m0", "시간표", S.Mode == 0), B("m1", "타이머", S.Mode == 1), B("m2", "스톱워치", S.Mode == 2)));
             gs.Add(G("교실 도구", false, B("msgs", "선생님 안내", st.Popup == 2), B("pick", "뽑기"), B("memo", "텍스트", st.MemoEdit), B("week", "이번 주")));
-            var sys = G(null, false, B("settings", "⚙ 설정"), B("hide", "숨기기")); sys.Plain = true; gs.Add(sys);
+            var sys = G(null, false, B("settings", "⚙ 설정"), B("hide", "숨기기"), B("quit", "닫기")); sys.Plain = true; gs.Add(sys);
 
             if (S.Mode == 1)
             {
@@ -621,7 +621,7 @@ namespace ClassroomHud
             {
                 bf = new Font(UiFam, (float)Math.Round(14 * k), FontStyle.Bold, GraphicsUnit.Pixel);
                 cf = new Font(UiFam, (float)Math.Round(12 * k), FontStyle.Bold, GraphicsUnit.Pixel);
-                float avail = Math.Max(cw, 820 * k) - tpad * 2;
+                float avail = Math.Max(cw, 880 * k) - tpad * 2;
                 groups = Groups(S, st);
                 foreach (var grp in groups)
                 {
@@ -701,7 +701,7 @@ namespace ClassroomHud
             }
 
             var comp = new Composition { Win = win, Content = content };
-            var bmp = new Bitmap(Math.Max(1, win.Width), Math.Max(1, win.Height), PixelFormat.Format32bppArgb);
+            var bmp = new Bitmap(Math.Max(1, Math.Min(8000, win.Width)), Math.Max(1, Math.Min(8000, win.Height)), PixelFormat.Format32bppArgb);
             comp.Bmp = bmp;
             using (var g = Graphics.FromImage(bmp))
             {

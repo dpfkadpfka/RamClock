@@ -352,6 +352,13 @@ namespace ClassroomHud
             return i;
         }
 
+        // 글자에서 날짜 찾기 (머리글 쪽 날짜를 더 믿는다)
+        public static DateTime? MondayFromText(string header, string all)
+        {
+            var runs = new List<PdfRun> { new PdfRun { Page = 0, Y = 100, Text = header ?? "", Size = 10 }, new PdfRun { Page = 0, Y = 0, Text = all ?? "", Size = 10 } };
+            return FindMonday(runs);
+        }
+
         static DateTime? FindMonday(List<PdfRun> runs)
         {
             int year = DateTime.Now.Year;
