@@ -426,7 +426,7 @@ namespace ClassroomHud
             previewTimer = new Timer { Interval = 120 };
             previewTimer.Tick += (o, e) => { previewTimer.Stop(); RenderPreview(); };
 
-            Page("화면 꾸미기", new Control[] { split }, new float[] { 100 }, false);
+            Page("디자인", new Control[] { split }, new float[] { 100 }, false);
             SetColor(R.Color);
             UpdateFontFile();
         }
@@ -795,21 +795,47 @@ namespace ClassroomHud
             cbTtDay.Items.AddRange(new object[] { "월요일", "화요일", "수요일", "목요일", "금요일" });
             cbTtDay.SelectedIndex = 0;
             cbTtDay.SelectedIndexChanged += (o, e) => { CommitTt(); ttDay = cbTtDay.SelectedIndex + 1; LoadTt(); };
-            var bWeek = B("이번 주 시간표 · 주간학습안내 PDF…");
-            bWeek.Font = Media.UiFont(10F, true);
-            bWeek.Click += (o, e) =>
-            {
-                if (!CommitSched(true)) return;
-                CommitTt();
-                using (var w = new WeekForm(R, null, DateTime.Today)) w.ShowDialog(this);
-            };
-            top.Controls.Add(cbTtDay); top.Controls.Add(bWeek);
+            top.Controls.Add(cbTtDay);
             gTt = NewGrid();
             gTt.Columns.Add(TextCol("교시", 18, true));
             gTt.Columns.Add(TextCol("과목", 60));
             gTt.Columns.Add(CheckCol("이동 수업", 22));
-            var note = Note("주간학습안내를 넣지 않은 주에 쓰는 기본 시간표예요. 매주 바뀌는 과목은 [이번 주 시간표 · 주간학습안내 PDF]에서 그 주 PDF를 불러오면 그 주에만 적용돼요. 처음 들어 있는 과목은 예시예요.");
-            Page("기본 시간표", new Control[] { top, gTt, note }, new float[] { 0, 100, 0 });
+            var note = Note("주간학습안내를 넣지 않은 주에 쓰는 기본 시간표예요. 매주 바뀌는 과목은 [이번 주 시간표]에서 주간학습안내(PDF·한글)를 넣으면 그 주에만 적용돼요. 처음 들어 있는 과목은 예시예요.");
+
+            // 시간표 안에서 [기본 시간표 | 이번 주 시간표] 나누기
+            var basic = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 3, BackColor = Color.Transparent, Margin = new Padding(0) };
+            basic.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+            basic.RowStyles.Add(new RowStyle(SizeType.AutoSize)); basic.RowStyles.Add(new RowStyle(SizeType.Percent, 100)); basic.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            top.Dock = DockStyle.Fill; gTt.Dock = DockStyle.Fill; note.Dock = DockStyle.Fill;
+            basic.Controls.Add(top, 0, 0); basic.Controls.Add(gTt, 0, 1); basic.Controls.Add(note, 0, 2);
+            var host = new Panel { Dock = DockStyle.Fill, BackColor = Color.Transparent, Margin = new Padding(0) };
+            host.Controls.Add(basic);
+            var sw = Flow();
+            var cBasic = new Chip { Text = "기본 시간표", AutoSize = true, Checked = true, Margin = new Padding(0, 0, 6, 8) };
+            var cWeek = new Chip { Text = "이번 주 시간표 (주간학습안내)", AutoSize = true, Margin = new Padding(0, 0, 6, 8) };
+            sw.Controls.Add(cBasic); sw.Controls.Add(cWeek);
+            WeekForm wk = null;
+            cWeek.CheckedChanged += (o, e) =>
+            {
+                if (!cWeek.Checked) return;
+                CommitTt();
+                if (wk == null || wk.IsDisposed)
+                {
+                    var d = DateTime.Today;
+                    if (d.DayOfWeek == DayOfWeek.Saturday || d.DayOfWeek == DayOfWeek.Sunday) d = d.AddDays(2);
+                    wk = new WeekForm(R, null, d) { TopLevel = false, FormBorderStyle = FormBorderStyle.None, Dock = DockStyle.Fill };
+                    host.Controls.Add(wk);
+                }
+                basic.Visible = false; wk.Visible = true; wk.BringToFront();
+            };
+            cBasic.CheckedChanged += (o, e) =>
+            {
+                if (!cBasic.Checked) return;
+                if (wk != null && !wk.IsDisposed) wk.Visible = false;
+                basic.Visible = true; LoadTt();
+            };
+            showWeek = () => cWeek.Checked = true;
+            Page("시간표", new Control[] { sw, host }, new float[] { 0, 100 });
         }
 
         void LoadTt()
@@ -920,7 +946,7 @@ namespace ClassroomHud
             bR.Click += (o, e) => { if (!AskReset("프로그램에 처음 들어 있던 안내 버튼들로 되돌려요.")) return; gMsgs.Rows.Clear(); foreach (var m in Settings.DefaultMessages()) AddMsgRow(m.Label, m.Text, "", ""); };
             bar.Controls.AddRange(new Control[] { bA, bMu, bMd, bR });
             var note = Note("위젯의 [선생님 안내]를 누르면 나오는 버튼이에요. 이미지를 넣으면 안내할 때 크게 보여 줘요(PNG·JPG·움직이는 GIF). 소리를 넣지 않으면 안내 문구를 읽어 줘요.");
-            Page("선생님 안내", new Control[] { gMsgs, bar, note }, new float[] { 100, 0, 0 });
+            Page("수동 음성 안내", new Control[] { gMsgs, bar, note }, new float[] { 100, 0, 0 });
         }
 
         int AddMsgRow(string label, string text, string sound, string image)
@@ -1003,7 +1029,7 @@ namespace ClassroomHud
             bar.Controls.AddRange(new Control[] { bTpl, bXl, bPhotos, bPaste, bClear, lPicked, bReset });
             UpdatePicked();
             var note = Note("[엑셀로 명단 넣기]는 나이스 명렬표처럼 번호·성명·성별 열이 있는 파일을 그대로 읽어요. 엑셀 칸에 사진을 넣어 두면 사진도 함께 들어가요. 사진 파일만 따로 있으면 [사진 한꺼번에 넣기]로 여러 장을 고르세요(파일 이름에 이름이나 번호). 이름을 비워 두면 번호로 뽑아요. 성별을 정해 두면 뽑기 창에서 [남자만]·[여자만]으로 뽑을 수 있어요. 프로필 사진을 넣으면 뽑힐 때 사진도 함께 나와요. 위젯의 [뽑기]를 누르면 시작해요.");
-            Page("뽑기", new Control[] { top, gStu, bar, note }, new float[] { 0, 100, 0, 0 });
+            Page("뽑기 도구", new Control[] { top, gStu, bar, note }, new float[] { 0, 100, 0, 0 });
         }
 
         static string GenderText(string g) { return g == "남" || g == "여" ? g : "—"; }
@@ -1220,10 +1246,12 @@ namespace ClassroomHud
                 toolChecks.Add(tg); tools.Controls.Add(tg);
             }
             var lLinks = new Label { Text = "자주 가는 사이트", AutoSize = true, Font = Media.UiFont(10.5F, true), Margin = new Padding(3, 14, 3, 4) };
-            Page("메뉴·바로가기", new Control[] { tools, lLinks, gLinks, bar, note }, new float[] { 0, 0, 100, 0, 0 });
+            Page("바로가기 도구", new Control[] { tools, lLinks, gLinks, bar, note }, new float[] { 0, 0, 100, 0, 0 });
         }
 
         List<CheckBox> toolChecks;
+        Action showWeek;
+        public void ShowWeekSubTab() { if (showWeek != null) showWeek(); }
         public void AddLinkRow(QuickLink l) { if (gLinks == null || l == null) return; int i = gLinks.Rows.Add(l.Name, l.Url); gLinks.CurrentCell = gLinks.Rows[i].Cells[0]; }
 
         void CommitLinks()

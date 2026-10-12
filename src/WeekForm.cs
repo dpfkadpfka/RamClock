@@ -78,6 +78,7 @@ namespace ClassroomHud
             bPdf = new GButton { Text = "원본 PDF 열기", AutoSize = true, MinimumSize = new Size(0, 36) };
             bClear = new GButton { Text = "이 주 내용 지우기", AutoSize = true, MinimumSize = new Size(0, 36) };
             var bClose = new GButton { Text = "닫기", AutoSize = true, MinimumSize = new Size(90, 36), DialogResult = DialogResult.OK };
+            closeBtn = bClose;
             bImport.Click += (o, e) => ImportPdf();
             bPdf.Click += (o, e) => { var wp = Plan(false); var p = wp != null ? Settings.MediaPath(wp.Pdf) : null; if (p != null) try { Process.Start(p); } catch { } };
             bClear.Click += (o, e) =>
@@ -208,9 +209,11 @@ namespace ClassroomHud
         }
 
         // 파일 끌어다 놓기: 창 어디에 놓아도 된다
+        Button closeBtn;
         protected override void OnLoad(EventArgs e)
         {
             base.OnLoad(e);
+            if (!TopLevel && closeBtn != null) closeBtn.Visible = false;   // 설정창 안에 들어갔을 때는 닫기 없음
             EnableDrop(this);
         }
         void EnableDrop(Control c)

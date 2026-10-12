@@ -541,7 +541,7 @@ namespace ClassroomHud
             var f = new SettingsForm(S.Clone());
             f.StartPosition = FormStartPosition.Manual;
             f.Location = PlaceAway(f.Size);
-            f.Saved = r => { var n = r.Clone(); n.Memo = S.Memo; ApplySettings(n); };   // 위젯에서 쓴 글은 그대로
+            f.Saved = r => { var n = r.Clone(); n.Memo = S.Memo; ApplySettings(n); };   // 위젯에서 쓴 글은 그대로   // 위젯에서 쓴 글은 그대로
             f.FormClosed += (o, e) =>
             {
                 if (f.DialogResult == DialogResult.OK) { f.R.Memo = S.Memo; ApplySettings(f.R); }

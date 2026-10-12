@@ -194,7 +194,7 @@ namespace ClassroomHud
             var t = new System.Windows.Forms.Timer { Interval = 700 };
             t.Tick += (o, e) =>
             {
-                if (step % 2 == 0) { int i = step / 2; if (i >= sf.TabCount) { t.Stop(); sf.Close(); return; } sf.SelectTab(i); }
+                if (step % 2 == 0) { int i = step / 2; if (i >= sf.TabCount) { t.Stop(); sf.Close(); return; } sf.SelectTab(i); if (i == 2 && Environment.GetEnvironmentVariable("WEEKTAB") == "1") sf.ShowWeekSubTab(); }
                 else Grab(sf, dir + "/settings_" + (step / 2 + 1) + ".png");
                 step++;
             };
