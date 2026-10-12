@@ -10,10 +10,7 @@
 (트레이 아이콘 메뉴의 [지금 업데이트]를 누르면 바로 바뀌어요.)
 
 ## 새 버전 내보내기 (관리자)
-태그를 올리면 Actions가 `RamClock.exe`를 만들어 Releases에 올려요.
-```
-git tag v1.0.1 && git push origin v1.0.1
-```
+`src/Updater.cs`의 `Version`을 올려서 main에 올리면, Actions가 `RamClock.exe`를 만들어 Releases(v버전)에 올려요.
 
 ## 들어 있는 글꼴
 나눔고딕·나눔손글씨 펜, 주아, 도현, 검은고딕, 해바라기, 개구 — 모두 SIL Open Font License 1.1 글꼴이에요. (`src/fontres/OFL.txt`)
