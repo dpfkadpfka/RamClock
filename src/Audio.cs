@@ -83,7 +83,7 @@ namespace ClassroomHud
         public static System.Collections.Generic.List<string> VoiceNames()
         {
             Init();
-            if (tokens == null) LoadTokens();
+            LoadTokens();   // 설정창을 열 때마다 새로 읽기 → 새로 설치한 목소리도 바로 보임
             var l = new System.Collections.Generic.List<string>(tokens.Keys);
             // 한국어 목소리를 앞으로
             l.Sort((a, b) => { bool ka = a.Contains("Korean") || a.Contains("한국"), kb = b.Contains("Korean") || b.Contains("한국"); return ka == kb ? string.Compare(a, b, StringComparison.Ordinal) : (ka ? -1 : 1); });
