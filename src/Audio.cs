@@ -91,8 +91,10 @@ namespace ClassroomHud
         }
 
         // 목소리·빠르기·크기 적용 (name이 비면 한국어 기본 목소리)
+        public static string CurrentName = "";
         public static void ApplyVoice(string name, int rate, int volume)
         {
+            CurrentName = name ?? "";
             Init();
             if (voice == null) return;
             try
@@ -108,7 +110,7 @@ namespace ClassroomHud
                 vt.InvokeMember("Rate", BindingFlags.SetProperty, null, voice, new object[] { Math.Max(-10, Math.Min(10, rate)) });
                 vt.InvokeMember("Volume", BindingFlags.SetProperty, null, voice, new object[] { Math.Max(0, Math.Min(100, volume)) });
             }
-            catch { }
+            catch (Exception ex) { Program.Log(new Exception("목소리 바꾸기 실패: " + name, ex)); }
         }
 
         static void SelectKorean()
@@ -137,7 +139,12 @@ namespace ClassroomHud
                 for (int i = 0; i < n; i++)
                     vt.InvokeMember("Speak", BindingFlags.InvokeMethod, null, voice, new object[] { text, i == 0 ? 3 : 1 });
             }
-            catch { }
+            catch (Exception ex)
+            {
+                // 고른 목소리가 소리를 못 내면 기록을 남기고 기본 한국어 목소리로라도 읽기
+                Program.Log(new Exception("목소리 재생 실패: " + CurrentName, ex));
+                try { SelectKorean(); vt.InvokeMember("Speak", BindingFlags.InvokeMethod, null, voice, new object[] { text, 3 }); } catch { }
+            }
         }
 
         // ---------- 소리 파일 ----------
