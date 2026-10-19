@@ -84,7 +84,13 @@ namespace ClassroomHud
         {
             Init();
             LoadTokens();   // 설정창을 열 때마다 새로 읽기 → 새로 설치한 목소리도 바로 보임
-            var l = new System.Collections.Generic.List<string>(tokens.Keys);
+            // 실제로 소리가 나는 한국어 목소리만 (내레이터·온라인 자연 음성은 학교 컴퓨터에서 소리가 안 나서 뺌)
+            var l = new System.Collections.Generic.List<string>();
+            foreach (var k in tokens.Keys)
+            {
+                if (k.Contains("(Natural)") || k.Contains("Online") || k.Contains("Neural")) continue;
+                if (k.Contains("Korean") || k.Contains("한국")) l.Add(k);
+            }
             // 한국어 목소리를 앞으로
             l.Sort((a, b) => { bool ka = a.Contains("Korean") || a.Contains("한국"), kb = b.Contains("Korean") || b.Contains("한국"); return ka == kb ? string.Compare(a, b, StringComparison.Ordinal) : (ka ? -1 : 1); });
             return l;
