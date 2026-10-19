@@ -87,6 +87,9 @@ namespace ClassroomHud
         public int Y { get; set; } = int.MinValue;     // 위젯 위쪽 Y
         public bool Readable { get; set; }
         public bool Voice { get; set; } = true;
+        public string VoiceName { get; set; } = "";      // 비면 한국어 기본 목소리
+        public int VoiceRate { get; set; } = 0;          // -10(느리게) ~ 10(빠르게)
+        public int VoiceVolume { get; set; } = 100;
         public bool Sfx { get; set; } = true;
         public bool Locked { get; set; }
         public bool ShowDate { get; set; } = true;

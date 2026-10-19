@@ -23,7 +23,7 @@ namespace ClassroomHud
         // 시간표
         ComboBox cbTtDay; DataGridView gTt; int ttDay = 1; bool ttLoaded;
         // 음성·안내
-        CheckBox chkVoice, chkSfx; DataGridView gRules, gMsgs;
+        CheckBox chkVoice, chkSfx; ComboBox cbVoice; Slider slRate; DataGridView gRules, gMsgs;
         // 화면
         CheckBox chkMemoBg, chkMemoBold, chkMemoLine; Slider slMemoSize, slMemoAlpha; Swatch bMemoColor, bMemoBg, bMemoLine; ComboBox cbMemoFont;
         CheckBox chkSec, chkTop, chkDate, chkStatus, chkReadable, chkLocked, chkAuto, chkOutline, chkShadow, chkDigitFont;
@@ -872,6 +872,28 @@ namespace ClassroomHud
             chkVoice = new Toggle { Text = "음성 안내 사용", AutoSize = true, Checked = R.Voice, Margin = new Padding(3, 5, 16, 3) };
             chkSfx = new Toggle { Text = "효과음(딩동) 사용", AutoSize = true, Checked = R.Sfx, Margin = new Padding(3, 5, 16, 3) };
             top.Controls.Add(chkVoice); top.Controls.Add(chkSfx);
+            // 목소리 고르기 · 빠르기
+            var vr = Flow();
+            vr.Controls.Add(new Label { Text = "목소리", AutoSize = true, Margin = new Padding(3, 9, 6, 3) });
+            cbVoice = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 290, Margin = new Padding(0, 5, 14, 3) };
+            cbVoice.Items.Add("기본 (한국어 목소리)");
+            foreach (var n in Audio.VoiceNames()) cbVoice.Items.Add(n);
+            cbVoice.SelectedItem = string.IsNullOrEmpty(R.VoiceName) || !cbVoice.Items.Contains(R.VoiceName) ? cbVoice.Items[0] : R.VoiceName;
+            vr.Controls.Add(cbVoice);
+            vr.Controls.Add(new Label { Text = "빠르기", AutoSize = true, Margin = new Padding(3, 9, 6, 3) });
+            slRate = new Slider { Minimum = -5, Maximum = 5, Width = 130, Height = 32, Margin = new Padding(0, 2, 14, 0) }; slRate.Value = Math.Max(-5, Math.Min(5, R.VoiceRate));
+            vr.Controls.Add(slRate);
+            var bHear = B("▶ 들어보기");
+            bHear.Click += (o, e) =>
+            {
+                Audio.ApplyVoice(cbVoice.SelectedIndex <= 0 ? "" : cbVoice.SelectedItem as string, slRate.Value, R.VoiceVolume);
+                Audio.Announce("안녕하세요. 1교시 국어 시간입니다.", null, 1, false, true);
+            };
+            vr.Controls.Add(bHear);
+            var vnote = Note("목소리를 더 넣으려면 윈도우 설정 → 시간 및 언어 → 음성 → [음성 추가]에서 한국어 목소리를 받아요. 받은 목소리는 이 목록에 바로 나와요.");
+            var vbox = new FlowLayoutPanel { FlowDirection = FlowDirection.TopDown, AutoSize = true, WrapContents = false, Margin = new Padding(0) };
+            vbox.Controls.Add(top); vbox.Controls.Add(vr); vbox.Controls.Add(vnote);
+            top = vbox;
             if (!Audio.HasKoreanVoice)
                 top.Controls.Add(new Label { Text = "컴퓨터에 한국어 음성이 없어요. 녹음이나 소리 파일을 쓰거나, 윈도우 설정 > 시간 및 언어 > 음성에서 추가해 주세요.", AutoSize = true, ForeColor = Color.Firebrick, Margin = new Padding(3, 7, 3, 3), MaximumSize = new Size(860, 0) });
 
@@ -882,7 +904,7 @@ namespace ClassroomHud
             gRules.Columns.Add(TextCol("안내 문구 (글자 읽기일 때 읽어요)", 46));
             gRules.Columns.Add(TextCol("소리", 18, true));
             gRules.Columns.Add(BtnCol("소리 바꾸기", 12));
-            gRules.Columns.Add(BtnCol("▶ 들어보기", 11)); gRules.Columns[gRules.Columns.Count - 1].Name = "test";
+            gRules.Columns.Add(BtnCol("▶ 듣기", 9)); gRules.Columns[gRules.Columns.Count - 1].Name = "test";
             gRules.Columns[gRules.Columns.Count - 2].Name = "sound";
             for (int i = 0; i < Settings.RuleKeys.Length; i++)
             {
@@ -920,7 +942,7 @@ namespace ClassroomHud
             gMsgs.Columns.Add(TextCol("이미지", 14, true));
             gMsgs.Columns.Add(BtnCol("소리…", 9));
             gMsgs.Columns.Add(BtnCol("이미지…", 10));
-            gMsgs.Columns.Add(BtnCol("▶ 들어보기", 11)); gMsgs.Columns[gMsgs.Columns.Count - 1].Name = "test";
+            gMsgs.Columns.Add(BtnCol("▶ 듣기", 9)); gMsgs.Columns[gMsgs.Columns.Count - 1].Name = "test";
             gMsgs.Columns[gMsgs.Columns.Count - 2].Name = "image"; gMsgs.Columns[gMsgs.Columns.Count - 3].Name = "sound";
             AddDeleteCol(gMsgs, null);
             foreach (var m in R.Messages) AddMsgRow(m.Label, m.Text, m.Sound, m.Image);
@@ -965,6 +987,7 @@ namespace ClassroomHud
         {
             gRules.EndEdit(); gMsgs.EndEdit();
             R.Voice = chkVoice.Checked; R.Sfx = chkSfx.Checked;
+            if (cbVoice != null) { R.VoiceName = cbVoice.SelectedIndex <= 0 ? "" : cbVoice.SelectedItem as string; R.VoiceRate = slRate.Value; }
             for (int i = 0; i < Settings.RuleKeys.Length && i < gRules.Rows.Count; i++)
             {
                 var row = gRules.Rows[i];

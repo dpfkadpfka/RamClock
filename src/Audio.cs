@@ -48,6 +48,69 @@ namespace ClassroomHud
             catch { voice = null; }
         }
 
+        // ---------- 목소리 고르기 ----------
+        static System.Collections.Generic.Dictionary<string, object> tokens;
+        static void LoadTokens()
+        {
+            tokens = new System.Collections.Generic.Dictionary<string, object>();
+            if (voice == null) return;
+            Action<object> add = coll =>
+            {
+                try
+                {
+                    int n = (int)coll.GetType().InvokeMember("Count", BindingFlags.GetProperty, null, coll, null);
+                    for (int i = 0; i < n; i++)
+                    {
+                        var t = coll.GetType().InvokeMember("Item", BindingFlags.InvokeMethod, null, coll, new object[] { i });
+                        string d = (string)t.GetType().InvokeMember("GetDescription", BindingFlags.InvokeMethod, null, t, new object[] { 0 });
+                        if (!string.IsNullOrEmpty(d) && !tokens.ContainsKey(d)) tokens[d] = t;
+                    }
+                }
+                catch { }
+            };
+            try { add(vt.InvokeMember("GetVoices", BindingFlags.InvokeMethod, null, voice, new object[] { "", "" })); } catch { }
+            // 윈도우 10·11의 추가 목소리(OneCore)도 함께
+            try
+            {
+                var ct = Type.GetTypeFromProgID("SAPI.SpObjectTokenCategory");
+                var cat = Activator.CreateInstance(ct);
+                ct.InvokeMember("SetId", BindingFlags.InvokeMethod, null, cat, new object[] { @"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Speech_OneCore\Voices", false });
+                add(ct.InvokeMember("EnumerateTokens", BindingFlags.InvokeMethod, null, cat, new object[] { "", "" }));
+            }
+            catch { }
+        }
+
+        public static System.Collections.Generic.List<string> VoiceNames()
+        {
+            Init();
+            if (tokens == null) LoadTokens();
+            var l = new System.Collections.Generic.List<string>(tokens.Keys);
+            // 한국어 목소리를 앞으로
+            l.Sort((a, b) => { bool ka = a.Contains("Korean") || a.Contains("한국"), kb = b.Contains("Korean") || b.Contains("한국"); return ka == kb ? string.Compare(a, b, StringComparison.Ordinal) : (ka ? -1 : 1); });
+            return l;
+        }
+
+        // 목소리·빠르기·크기 적용 (name이 비면 한국어 기본 목소리)
+        public static void ApplyVoice(string name, int rate, int volume)
+        {
+            Init();
+            if (voice == null) return;
+            try
+            {
+                if (tokens == null) LoadTokens();
+                object t;
+                if (!string.IsNullOrEmpty(name) && tokens.TryGetValue(name, out t))
+                {
+                    try { vt.InvokeMember("Voice", BindingFlags.PutRefDispProperty, null, voice, new object[] { t }); }
+                    catch { vt.InvokeMember("Voice", BindingFlags.SetProperty, null, voice, new object[] { t }); }
+                }
+                else SelectKorean();
+                vt.InvokeMember("Rate", BindingFlags.SetProperty, null, voice, new object[] { Math.Max(-10, Math.Min(10, rate)) });
+                vt.InvokeMember("Volume", BindingFlags.SetProperty, null, voice, new object[] { Math.Max(0, Math.Min(100, volume)) });
+            }
+            catch { }
+        }
+
         static void SelectKorean()
         {
             try

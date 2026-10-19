@@ -56,6 +56,7 @@ namespace ClassroomHud
             using (var g = CreateGraphics()) sysK = Math.Max(1f, g.DpiX / 96f);
             dpiK = sysK;
             Audio.Init();
+            Audio.ApplyVoice(S.VoiceName, S.VoiceRate, S.VoiceVolume);
             BuildTray();
             EnsurePosition();
             ApplyAutoStart();
@@ -585,6 +586,7 @@ namespace ClassroomHud
             {
                 if (f.DialogResult == DialogResult.OK) { f.R.Memo = S.Memo; ApplySettings(f.R); }
                 settingsForm = null; previewS = null; Raise();
+                Audio.ApplyVoice(S.VoiceName, S.VoiceRate, S.VoiceVolume);   // 들어보기로 바꾼 목소리 되돌리기
                 st.Popup = 0; ver++; Render(true);
                 BeginInvoke(new Action(() => f.Dispose()));
             };
@@ -628,6 +630,7 @@ namespace ClassroomHud
             KeepLive(n);
             S = n;
             S.FillMissing();
+            Audio.ApplyVoice(S.VoiceName, S.VoiceRate, S.VoiceVolume);
             EnsurePosition();
             S.Save();
             TopMost = S.TopMostOn;
