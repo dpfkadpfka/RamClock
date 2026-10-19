@@ -886,8 +886,21 @@ namespace ClassroomHud
             var bHear = B("▶ 들어보기");
             bHear.Click += (o, e) =>
             {
-                Audio.ApplyVoice(cbVoice.SelectedIndex <= 0 ? "" : cbVoice.SelectedItem as string, slRate.Value, R.VoiceVolume);
-                Audio.Announce("안녕하세요. 1교시 국어 시간입니다.", null, 1, false, true);
+                string vn = cbVoice.SelectedIndex <= 0 ? "" : cbVoice.SelectedItem as string;
+                Audio.Stop();
+                bHear.Enabled = false; bHear.Text = "읽는 중…";
+                Audio.TestVoice(vn, slRate.Value, "안녕하세요. 1교시 국어 시간입니다.", err =>
+                {
+                    try
+                    {
+                        BeginInvoke(new Action(() =>
+                        {
+                            bHear.Enabled = true; bHear.Text = "▶ 들어보기";
+                            if (err != null) MessageBox.Show(this, "이 목소리는 지금 소리를 낼 수 없어요.\n\n" + vn + "\n이유: " + err + "\n\n다른 목소리를 골라 주세요.", "RamClock", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        }));
+                    }
+                    catch { }
+                });
             };
             vr.Controls.Add(bHear);
             var vnote = Note("목소리를 더 넣으려면 윈도우 설정 → 시간 및 언어 → 음성 → [음성 추가]에서 한국어 목소리를 받아요. 받은 목소리는 이 목록에 바로 나와요.");

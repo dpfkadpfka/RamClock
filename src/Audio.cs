@@ -90,6 +90,49 @@ namespace ClassroomHud
             return l;
         }
 
+        // 들어보기: 따로 만든 목소리로 끝까지 읽어 보고, 안 되면 이유를 돌려준다 (null이면 성공)
+        public static void TestVoice(string name, int rate, string text, Action<string> done)
+        {
+            var th = new System.Threading.Thread(() =>
+            {
+                string err = null;
+                try
+                {
+                    var t2 = Type.GetTypeFromProgID("SAPI.SpVoice");
+                    var v2 = Activator.CreateInstance(t2);
+                    if (!string.IsNullOrEmpty(name))
+                    {
+                        object tok = null;
+                        var coll = t2.InvokeMember("GetVoices", BindingFlags.InvokeMethod, null, v2, new object[] { "", "" });
+                        int n = (int)coll.GetType().InvokeMember("Count", BindingFlags.GetProperty, null, coll, null);
+                        for (int i = 0; i < n && tok == null; i++)
+                        {
+                            var x = coll.GetType().InvokeMember("Item", BindingFlags.InvokeMethod, null, coll, new object[] { i });
+                            if ((string)x.GetType().InvokeMember("GetDescription", BindingFlags.InvokeMethod, null, x, new object[] { 0 }) == name) tok = x;
+                        }
+                        if (tok == null && tokens != null) tokens.TryGetValue(name, out tok);
+                        if (tok == null) throw new Exception("목록에서 이 목소리를 찾지 못했어요.");
+                        try { t2.InvokeMember("Voice", BindingFlags.PutRefDispProperty, null, v2, new object[] { tok }); }
+                        catch { t2.InvokeMember("Voice", BindingFlags.SetProperty, null, v2, new object[] { tok }); }
+                    }
+                    t2.InvokeMember("Rate", BindingFlags.SetProperty, null, v2, new object[] { Math.Max(-10, Math.Min(10, rate)) });
+                    var sw = System.Diagnostics.Stopwatch.StartNew();
+                    t2.InvokeMember("Speak", BindingFlags.InvokeMethod, null, v2, new object[] { text, 0 });   // 끝까지 기다림
+                    if (sw.ElapsedMilliseconds < 300) err = "소리를 만들지 못하고 바로 끝났어요. (온라인 목소리라면 인터넷·학교망 차단, 내레이터 목소리라면 윈도우 11 최신 음성과 호환이 안 되는 경우예요)";
+                }
+                catch (Exception ex)
+                {
+                    var e = ex is TargetInvocationException && ex.InnerException != null ? ex.InnerException : ex;
+                    err = e.Message + (e is COMException ? " (코드 0x" + ((COMException)e).ErrorCode.ToString("X8") + ")" : "");
+                    Program.Log(new Exception("목소리 시험 실패: " + name, e));
+                }
+                if (done != null) done(err);
+            });
+            th.SetApartmentState(System.Threading.ApartmentState.STA);
+            th.IsBackground = true;
+            th.Start();
+        }
+
         // 목소리·빠르기·크기 적용 (name이 비면 한국어 기본 목소리)
         public static string CurrentName = "";
         public static void ApplyVoice(string name, int rate, int volume)
