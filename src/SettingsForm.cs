@@ -882,7 +882,8 @@ namespace ClassroomHud
             gRules.Columns.Add(TextCol("안내 문구 (글자 읽기일 때 읽어요)", 46));
             gRules.Columns.Add(TextCol("소리", 18, true));
             gRules.Columns.Add(BtnCol("소리 바꾸기", 12));
-            gRules.Columns.Add(BtnCol("테스트", 9));
+            gRules.Columns.Add(BtnCol("▶ 들어보기", 11)); gRules.Columns[gRules.Columns.Count - 1].Name = "test";
+            gRules.Columns[gRules.Columns.Count - 2].Name = "sound";
             for (int i = 0; i < Settings.RuleKeys.Length; i++)
             {
                 var r = R.Rules[Settings.RuleKeys[i]];
@@ -894,12 +895,13 @@ namespace ClassroomHud
                 if (e.RowIndex < 0) return;
                 gRules.EndEdit();
                 var row = gRules.Rows[e.RowIndex];
-                if (e.ColumnIndex == 5)
+                if (!(gRules.Columns[e.ColumnIndex] is DataGridViewButtonColumn)) return;   // 글자 칸을 누를 때는 아무 소리 없이 고치기만
+                if (gRules.Columns[e.ColumnIndex].Name == "sound")
                 {
                     using (var d = new SoundDialog(row.Cells[1].Value as string, row.Tag as string, Sched.Fill(row.Cells[3].Value as string, 1, "국어")))
                         if (d.ShowDialog(this) == DialogResult.OK) { row.Tag = d.Result; row.Cells[4].Value = SoundText(d.Result); }
                 }
-                else if (e.ColumnIndex == 6)
+                else if (gRules.Columns[e.ColumnIndex].Name == "test")
                     Audio.Announce(Sched.Fill(row.Cells[3].Value as string, 1, "국어"), row.Tag as string, Times(row.Cells[2].Value), true, true);
             };
             var note = Note("{n}은 교시 번호, {subj}는 과목 이름으로 바뀌어요. [소리 바꾸기]에서 소리 파일(mp3·wav)을 넣거나 마이크로 직접 녹음하면 글자 읽기 대신 그 소리가 나와요.");
@@ -918,26 +920,29 @@ namespace ClassroomHud
             gMsgs.Columns.Add(TextCol("이미지", 14, true));
             gMsgs.Columns.Add(BtnCol("소리…", 9));
             gMsgs.Columns.Add(BtnCol("이미지…", 10));
-            gMsgs.Columns.Add(BtnCol("테스트", 9));
+            gMsgs.Columns.Add(BtnCol("▶ 들어보기", 11)); gMsgs.Columns[gMsgs.Columns.Count - 1].Name = "test";
+            gMsgs.Columns[gMsgs.Columns.Count - 2].Name = "image"; gMsgs.Columns[gMsgs.Columns.Count - 3].Name = "sound";
             AddDeleteCol(gMsgs, null);
             foreach (var m in R.Messages) AddMsgRow(m.Label, m.Text, m.Sound, m.Image);
             gMsgs.CellContentClick += (o, e) =>
             {
-                if (e.RowIndex < 0) return;
+                if (e.RowIndex < 0 || e.RowIndex >= gMsgs.Rows.Count) return;
+                string cn = gMsgs.Columns[e.ColumnIndex].Name;
+                if (cn != "sound" && cn != "image" && cn != "test") return;   // 글자 칸은 고치기만
                 gMsgs.EndEdit();
                 var row = gMsgs.Rows[e.RowIndex]; var tag = (MsgTag)row.Tag;
                 string label = row.Cells[0].Value as string ?? "";
-                if (e.ColumnIndex == 4)
+                if (cn == "sound")
                 {
                     using (var d = new SoundDialog(label, tag.Sound, row.Cells[1].Value as string))
                         if (d.ShowDialog(this) == DialogResult.OK) { tag.Sound = d.Result; row.Cells[2].Value = SoundText(d.Result); }
                 }
-                else if (e.ColumnIndex == 5)
+                else if (cn == "image")
                 {
                     using (var d = new ImageDialog(label, tag.Image))
                         if (d.ShowDialog(this) == DialogResult.OK) { tag.Image = d.Result; row.Cells[3].Value = ImageText(d.Result); }
                 }
-                else if (e.ColumnIndex == 6) Audio.Announce(row.Cells[1].Value as string, tag.Sound, 1, true, true);
+                else if (cn == "test") Audio.Announce(row.Cells[1].Value as string, tag.Sound, 1, true, true);
             };
             var bar = Flow();
             var bA = B("+ 안내 버튼 추가"); var bMu = Arrow("▲", "고른 줄을 위로"); var bMd = Arrow("▼", "고른 줄을 아래로"); var bR = B("처음 안내로 되돌리기");

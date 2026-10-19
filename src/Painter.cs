@@ -504,7 +504,7 @@ namespace ClassroomHud
                 if (S.Tools == null || S.Tools.Contains(t[0]))
                     tools.Add(B(t[0], t[1], (t[0] == "msgs" && st.Popup == 2) || (t[0] == "memo" && st.MemoEdit)));
             if (tools.Count > 0) gs.Add(G("교실 도구", false, tools.ToArray()));
-            var sys = G(null, false, B("settings", "⚙ 설정"), B("hide", "숨기기"), B("quit", "닫기")); sys.Plain = true; gs.Add(sys);
+            var sys = G(null, false, B("pin", "항상 위", S.TopMostOn), B("settings", "⚙ 설정"), B("hide", "숨기기"), B("quit", "닫기")); sys.Plain = true; gs.Add(sys);
 
             if (S.Mode == 1)
             {

@@ -100,7 +100,24 @@ namespace ClassroomHud
         }
 
         // ---------- 그리기 ----------
+        bool rendering, renderAgain;
         void Render(bool force)
+        {
+            // 끌고 있는 동안이나 그리는 도중에 다시 그리면 창이 제자리로 튕기며 떨리고 멈출 수 있어서 막는다
+            if (dragging) return;
+            if (rendering) { renderAgain = true; return; }
+            rendering = true;
+            try { RenderCore(force); }
+            catch (Exception ex) { Program.Log(ex); }
+            finally { rendering = false; }
+            if (renderAgain)
+            {
+                renderAgain = false;
+                try { BeginInvoke(new Action(() => Render(true))); } catch { }
+            }
+        }
+
+        void RenderCore(bool force)
         {
             if ((!Visible || WindowState == FormWindowState.Minimized) && !force) return;
             if (WindowState == FormWindowState.Minimized) return;
@@ -413,6 +430,11 @@ namespace ClassroomHud
                 case "settings": OpenSettings(); return;
                 case "hide": HideToTray(); return;
                 case "quit": ExitApp(); return;
+                case "pin":
+                    S.TopMostOn = !S.TopMostOn; S.Save();
+                    TopMost = S.TopMostOn;
+                    try { SetWindowPos(Handle, new IntPtr(S.TopMostOn ? -1 : -2), 0, 0, 0, 0, 0x0001 | 0x0002 | 0x0010); } catch { }
+                    break;
                 case "cpick": PickColor(); return;
                 case "tm-":
                 case "tm+":
@@ -658,10 +680,17 @@ namespace ClassroomHud
             ver++; Render(true);
         }
 
+        FormWindowState lastState = FormWindowState.Normal;
         protected override void OnResize(EventArgs e)
         {
             base.OnResize(e);
-            if (WindowState == FormWindowState.Normal && IsHandleCreated) { miShow.Text = "숨기기"; ver++; Render(true); }
+            // 최소화에서 돌아올 때만 다시 그림 (창 크기가 바뀔 때마다 다시 그리면 서로 꼬리를 물며 떨림)
+            if (WindowState == FormWindowState.Normal && lastState == FormWindowState.Minimized && IsHandleCreated)
+            {
+                if (miShow != null) miShow.Text = "숨기기";
+                ver++; BeginInvoke(new Action(() => Render(true)));
+            }
+            lastState = WindowState;
         }
 
         // 바로가기 줄의 [+]: 주소 넣는 작은 창
