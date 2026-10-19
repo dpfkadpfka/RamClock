@@ -430,6 +430,23 @@ namespace ClassroomHud
                 case "settings": OpenSettings(); return;
                 case "hide": HideToTray(); return;
                 case "quit": ExitApp(); return;
+                case "max":
+                    if (!st.Maximized)
+                    {
+                        // 화면을 꽉 채우도록 크게 (다시 누르면 원래 크기·자리로)
+                        var wa = Screen.FromPoint(new Point(S.X, S.Y)).WorkingArea;
+                        st.MaxPrevX = S.X; st.MaxPrevY = S.Y; st.MaxPrevScale = S.Scale;
+                        float ratio = Math.Min(wa.Width * 0.86f / Math.Max(1, comp.Content.Width), wa.Height * 0.62f / Math.Max(1, comp.Content.Height));
+                        S.Scale = Math.Max(0.35f, Math.Min(8f, S.Scale * ratio));
+                        S.X = wa.Left + wa.Width / 2;
+                        S.Y = wa.Top + (int)(wa.Height * 0.16f);
+                        st.Maximized = true;
+                    }
+                    else
+                    {
+                        S.X = st.MaxPrevX; S.Y = st.MaxPrevY; S.Scale = st.MaxPrevScale; st.Maximized = false;
+                    }
+                    break;
                 case "pin":
                     S.TopMostOn = !S.TopMostOn; S.Save();
                     TopMost = S.TopMostOn;
@@ -729,6 +746,7 @@ namespace ClassroomHud
 
         protected override void OnFormClosing(FormClosingEventArgs e)
         {
+            if (st.Maximized) { S.X = st.MaxPrevX; S.Y = st.MaxPrevY; S.Scale = st.MaxPrevScale; st.Maximized = false; }
             // 작업 표시줄의 [창 닫기]·Alt+F4도 진짜 종료 (숨기기는 위젯의 [숨기기] 버튼)
             exiting = true;
             if (memoEd != null && !memoEd.IsDisposed) { try { S.Memo = memoEd.MemoText; } catch { } }

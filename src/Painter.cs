@@ -22,6 +22,7 @@ namespace ClassroomHud
     {
         public string Caption;
         public bool NewLine, Plain;
+        public string Slot = "extra";   // mode(왼쪽 아래) / tools(오른쪽 아래) / extra(그 아래 가운데)
         public List<Btn> Btns = new List<Btn>();
         public List<List<Btn>> Lines = new List<List<Btn>>();
         public List<float> LineW = new List<float>();
@@ -44,6 +45,7 @@ namespace ClassroomHud
         public DateTime WStart;
         public List<long> Laps = new List<long>();
         public float StickW; public string StickKey;
+        public bool Maximized; public int MaxPrevX, MaxPrevY; public float MaxPrevScale;   // 크게 보기
         public bool MemoEdit;                         // 위젯에서 바로 메모를 쓰는 중   // 폭이 매초 바뀌어 흔들리지 않도록
 
         public long WElapsed(DateTime now) { return WBase + (WRun ? (long)(now - WStart).TotalMilliseconds : 0); }
@@ -498,13 +500,12 @@ namespace ClassroomHud
         static List<Grp> Groups(Settings S, HudState st)
         {
             var gs = new List<Grp>();
-            gs.Add(G("모드", false, B("m0", "시간표", S.Mode == 0), B("m1", "타이머", S.Mode == 1), B("m2", "스톱워치", S.Mode == 2)));
+            var gm = G(null, false, B("m0", "시간표", S.Mode == 0), B("m1", "타이머", S.Mode == 1), B("m2", "스톱워치", S.Mode == 2)); gm.Slot = "mode"; gs.Add(gm);
             var tools = new List<Btn>();
             foreach (var t in Settings.ToolList)
                 if (S.Tools == null || S.Tools.Contains(t[0]))
                     tools.Add(B(t[0], t[1], (t[0] == "msgs" && st.Popup == 2) || (t[0] == "memo" && st.MemoEdit)));
-            if (tools.Count > 0) gs.Add(G("교실 도구", false, tools.ToArray()));
-            var sys = G(null, false, B("pin", "항상 위", S.TopMostOn), B("settings", "⚙ 설정"), B("hide", "숨기기"), B("quit", "닫기")); sys.Plain = true; gs.Add(sys);
+            if (tools.Count > 0) { var gt = G(null, false, tools.ToArray()); gt.Slot = "tools"; gs.Add(gt); }
 
             if (S.Mode == 1)
             {
@@ -648,6 +649,7 @@ namespace ClassroomHud
                 List<Grp> row = null; float rw = 0, rh = 0;
                 foreach (var grp in groups)
                 {
+                    if (grp.Slot != "extra") continue;
                     float add = (row != null && row.Count > 0 ? ggap : 0) + grp.W;
                     if (row == null || grp.NewLine || (row.Count > 0 && rw + add > avail))
                     {
@@ -669,39 +671,59 @@ namespace ClassroomHud
             int CW = (int)Math.Ceiling(cw), CH = (int)Math.Ceiling(ch);
             if ((CW & 1) == 1) CW++;
             var content = new Rectangle(cx - CW / 2, top, CW, CH);
-            Rectangle tb = Rectangle.Empty, win = content, lb = Rectangle.Empty;
-            var links = new List<Btn>();
+            Rectangle tb = Rectangle.Empty, win = content, rMode = Rectangle.Empty, rTools = Rectangle.Empty, rLinks = Rectangle.Empty, rSys = Rectangle.Empty;
+            var links = new List<Btn>(); var sysBtns = new List<Btn>();
             if (st.Hover)
             {
-                int TW = (int)Math.Ceiling(tbW), TH = (int)Math.Ceiling(tbH), off = (int)(6 * k);
-                int tbTop = content.Bottom + off;
-                if (tbTop + TH > work.Bottom && content.Top - off - TH >= work.Top) tbTop = content.Top - off - TH;
-                tb = new Rectangle(cx - TW / 2, tbTop, TW, TH);
-                win = Rectangle.Union(content, tb);
-                // 자주 가는 사이트: 시계 위쪽에 (마우스를 올렸을 때만)
-                if (S.Links != null && S.Links.Count > 0 && bf != null)
+                int off = (int)(6 * k), pp = (int)Math.Round(tpad * 0.75f);
+                float ib = (float)Math.Round(bh * 1.15f);
+                // 오른쪽 위: 설정 · 항상 위(압정) · 최소화 · 최대화 · 닫기 (아이콘)
+                foreach (var id in new[] { "settings", "pin", "hide", "max", "quit" })
+                    sysBtns.Add(new Btn { Id = id, Text = "", On = (id == "pin" && S.TopMostOn) || (id == "max" && st.Maximized), R = new RectangleF(0, 0, ib, ib) });
+                int SW = (int)Math.Ceiling(sysBtns.Count * ib + (sysBtns.Count - 1) * bgap + 2 * pp), SH = (int)Math.Ceiling(ib + 2 * pp);
+                // 왼쪽 위: 자주 가는 사이트
+                if (S.Links != null)
                 {
-                    float lw = 0;
                     for (int i = 0; i < S.Links.Count; i++)
                     {
                         var L = S.Links[i]; if (string.IsNullOrWhiteSpace(L.Url)) continue;
                         string t = string.IsNullOrWhiteSpace(L.Name) ? L.Url : L.Name;
-                        float bw = bh * 1.25f;   // 아이콘만 (크롬 북마크 아이콘처럼)
                         Image ico = null; try { ico = LinkIcons.Get(L.Url); } catch { }
-                        links.Add(new Btn { Id = "link:" + i, Text = t, Icon = ico, Swatch = null, R = new RectangleF(0, 0, bw, bh) });
-                        lw += bw + (links.Count > 1 ? bgap : 0);
+                        links.Add(new Btn { Id = "link:" + i, Text = t, Icon = ico, R = new RectangleF(0, 0, ib, ib) });
                     }
-                    if (links.Count > 0) { links.Add(new Btn { Id = "linkadd", Text = "+", R = new RectangleF(0, 0, bh * 1.25f, bh * 1.25f) }); lw += bh * 1.25f + bgap; }
-                    if (links.Count > 0)
-                    {
-                        int LW = (int)Math.Ceiling(lw + 2 * tpad * 0.75f), LH = (int)Math.Ceiling(bh * 1.25f + 2 * tpad * 0.75f);
-                        bool above = tbTop > content.Top;
-                        int lbTop = above ? content.Top - off - LH : tb.Bottom + off;
-                        if (above && lbTop < work.Top) lbTop = tb.Bottom + off;
-                        lb = new Rectangle(cx - LW / 2, lbTop, LW, LH);
-                        win = Rectangle.Union(win, lb);
-                    }
+                    links.Add(new Btn { Id = "linkadd", Text = "+", R = new RectangleF(0, 0, ib, ib) });
                 }
+                int LW = links.Count > 0 ? (int)Math.Ceiling(links.Count * ib + (links.Count - 1) * bgap + 2 * pp) : 0, LH = SH;
+                // 아래: 모드(왼쪽) · 교실 도구(오른쪽)
+                Grp gMode = null, gTools = null;
+                foreach (var gg in groups) { if (gg.Slot == "mode") gMode = gg; else if (gg.Slot == "tools") gTools = gg; }
+                int MW = gMode != null ? (int)Math.Ceiling(gMode.W + 2 * pp) : 0, MH = gMode != null ? (int)Math.Ceiling(gMode.H + 2 * pp) : 0;
+                int TW2 = gTools != null ? (int)Math.Ceiling(gTools.W + 2 * pp) : 0, TH2 = gTools != null ? (int)Math.Ceiling(gTools.H + 2 * pp) : 0;
+                Func<int, int, int[]> pair = (lw2, rw2) =>
+                {
+                    int gp = (int)(10 * k);
+                    if (lw2 + gp + rw2 <= content.Width) return new[] { content.Left, content.Right - rw2 };
+                    int st0 = cx - (lw2 + gp + rw2) / 2;
+                    return new[] { st0, st0 + lw2 + gp };
+                };
+                int bottomTop = content.Bottom + off, bottomH = Math.Max(MH, TH2);
+                var px = pair(MW, TW2);
+                if (MW > 0) rMode = new Rectangle(px[0], bottomTop, MW, MH);
+                if (TW2 > 0) rTools = new Rectangle(px[1], bottomTop, TW2, TH2);
+                int nextTop = bottomTop + (bottomH > 0 ? bottomH + off : 0);
+                // 타이머·스톱워치 조작, 선생님 안내 목록은 그 아래 가운데
+                if (rows.Count > 0)
+                {
+                    int TW = (int)Math.Ceiling(tbW), TH = (int)Math.Ceiling(tbH);
+                    tb = new Rectangle(cx - TW / 2, nextTop, TW, TH);
+                    nextTop = tb.Bottom + off;
+                }
+                int topTop = content.Top - off - Math.Max(SH, LH);
+                if (topTop < work.Top) topTop = nextTop;   // 위에 자리가 없으면 맨 아래로
+                var tx2 = pair(LW, SW);
+                if (LW > 0) rLinks = new Rectangle(tx2[0], topTop, LW, LH);
+                rSys = new Rectangle(tx2[1], topTop, SW, SH);
+                foreach (var r0 in new[] { rMode, rTools, tb, rLinks, rSys }) if (!r0.IsEmpty) win = Rectangle.Union(win, r0);
             }
 
             var comp = new Composition { Win = win, Content = content };
@@ -800,72 +822,89 @@ namespace ClassroomHud
                     }
                 }
 
-                if (links.Count > 0)
-                {
-                    g.PixelOffsetMode = PixelOffsetMode.None;
-                    g.TextRenderingHint = TextRenderingHint.AntiAliasGridFit;
-                    var lr = new RectangleF(lb.X - win.X + 0.5f, lb.Y - win.Y + 0.5f, lb.Width - 1, lb.Height - 1);
-                    using (var rr = Round(lr, 12 * k))
-                    {
-                        using (var b = new SolidBrush(Color.FromArgb(246, 255, 255, 255))) g.FillPath(b, rr);
-                        using (var pen = new Pen(Color.FromArgb(220, Line), Math.Max(1f, k))) g.DrawPath(pen, rr);
-                    }
-                    var lsf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center };
-                    float lx = lr.X + tpad * 0.75f, ly2 = lr.Y + tpad * 0.75f;
-                    foreach (var b in links)
-                    {
-                        b.R = new RectangleF((float)Math.Round(lx) + 0.5f, (float)Math.Round(ly2) + 0.5f, (float)Math.Round(b.R.Width), (float)Math.Round(bh * 1.25f));
-                        if (b.Id == "linkadd") DrawBtn(g, b, bf, lsf, k, bh * 1.25f);
-                        else DrawLinkBtn(g, b, bf, k, bh);
-                        comp.Btns.Add(b);
-                        lx += b.R.Width + bgap;
-                    }
-                    lsf.Dispose();
-                }
-
                 if (st.Hover && groups != null)
                 {
-                    // 버튼 글자는 화소에 딱 맞춰 선명하게 (반 픽셀 밀림 없이)
                     g.PixelOffsetMode = PixelOffsetMode.None;
                     g.TextRenderingHint = TextRenderingHint.AntiAliasGridFit;
-                    var pr = new RectangleF(tb.X - win.X + 0.5f, tb.Y - win.Y + 0.5f, tb.Width - 1, tb.Height - 1);
-                    using (var rr = Round(pr, 12 * k))
-                    {
-                        using (var b = new SolidBrush(Color.FromArgb(246, 255, 255, 255))) g.FillPath(b, rr);
-                        using (var pen = new Pen(Color.FromArgb(220, Line), Math.Max(1f, k))) g.DrawPath(pen, rr);
-                    }
                     var sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center };
                     var sfl = new StringFormat { Alignment = StringAlignment.Near, LineAlignment = StringAlignment.Center };
-                    float ry = pr.Y + tpad;
-                    for (int r = 0; r < rows.Count; r++)
+                    float pp2 = (float)Math.Round(tpad * 0.75f);
+                    Func<Rectangle, RectangleF> panel = rr0 =>
                     {
-                        float gx = pr.X + (pr.Width - rowW[r]) / 2f;
-                        foreach (var grp in rows[r])
+                        var pr0 = new RectangleF(rr0.X - win.X + 0.5f, rr0.Y - win.Y + 0.5f, rr0.Width - 1, rr0.Height - 1);
+                        using (var rr = Round(pr0, 12 * k))
                         {
-                            var gr = new RectangleF((float)Math.Round(gx) + 0.5f, (float)Math.Round(ry) + 0.5f, (float)Math.Round(grp.W), (float)Math.Round(grp.H));
-                            if (!grp.Plain)
-                            {
-                                using (var rr = Round(gr, 10 * k)) using (var b = new SolidBrush(GroupBg)) g.FillPath(b, rr);
-                            }
-                            if (grp.Caption != null)
-                                using (var cb = new SolidBrush(Muted))
-                                    g.DrawString(grp.Caption, cf, cb, new RectangleF(gr.X + gpad + 4 * k, gr.Y + gpad, grp.CapW, bh), sfl);
-                            float ly = gr.Y + gpad;
-                            foreach (var line in grp.Lines)
-                            {
-                                float bx = gr.X + gpad + grp.CapW;
-                                foreach (var b in line)
-                                {
-                                    b.R = new RectangleF((float)Math.Round(bx) + 0.5f, (float)Math.Round(ly) + 0.5f, (float)Math.Round(b.R.Width), (float)Math.Round(bh));
-                                    DrawBtn(g, b, bf, sf, k, bh);
-                                    comp.Btns.Add(b);
-                                    bx += b.R.Width + bgap;
-                                }
-                                ly += bh + bgap;
-                            }
-                            gx += grp.W + ggap;
+                            using (var b = new SolidBrush(Color.FromArgb(246, 255, 255, 255))) g.FillPath(b, rr);
+                            using (var pen = new Pen(Color.FromArgb(220, Line), Math.Max(1f, k))) g.DrawPath(pen, rr);
                         }
-                        ry += rowH[r] + rgap;
+                        return pr0;
+                    };
+                    Action<Grp, float, float> drawGroup = (grp, gx0, gy0) =>
+                    {
+                        var gr = new RectangleF((float)Math.Round(gx0) + 0.5f, (float)Math.Round(gy0) + 0.5f, (float)Math.Round(grp.W), (float)Math.Round(grp.H));
+                        if (!grp.Plain) using (var rr = Round(gr, 10 * k)) using (var b = new SolidBrush(GroupBg)) g.FillPath(b, rr);
+                        if (grp.Caption != null)
+                            using (var cb = new SolidBrush(Muted))
+                                g.DrawString(grp.Caption, cf, cb, new RectangleF(gr.X + gpad + 4 * k, gr.Y + gpad, grp.CapW, bh), sfl);
+                        float ly = gr.Y + gpad;
+                        foreach (var line in grp.Lines)
+                        {
+                            float bx = gr.X + gpad + grp.CapW;
+                            foreach (var b in line)
+                            {
+                                b.R = new RectangleF((float)Math.Round(bx) + 0.5f, (float)Math.Round(ly) + 0.5f, (float)Math.Round(b.R.Width), (float)Math.Round(bh));
+                                DrawBtn(g, b, bf, sf, k, bh);
+                                comp.Btns.Add(b);
+                                bx += b.R.Width + bgap;
+                            }
+                            ly += bh + bgap;
+                        }
+                    };
+                    // 아래 왼쪽: 모드 / 아래 오른쪽: 교실 도구
+                    foreach (var grp in groups)
+                    {
+                        Rectangle at = grp.Slot == "mode" ? rMode : grp.Slot == "tools" ? rTools : Rectangle.Empty;
+                        if (at.IsEmpty) continue;
+                        var pr0 = panel(at);
+                        drawGroup(grp, pr0.X + pp2, pr0.Y + pp2);
+                    }
+                    // 그 아래 가운데: 타이머 조작·선생님 안내 목록
+                    if (rows.Count > 0 && !tb.IsEmpty)
+                    {
+                        var pr = panel(tb);
+                        float ry = pr.Y + tpad;
+                        for (int r = 0; r < rows.Count; r++)
+                        {
+                            float gx = pr.X + (pr.Width - rowW[r]) / 2f;
+                            foreach (var grp in rows[r]) { drawGroup(grp, gx, ry); gx += grp.W + ggap; }
+                            ry += rowH[r] + rgap;
+                        }
+                    }
+                    // 위 왼쪽: 사이트 로고
+                    if (!rLinks.IsEmpty)
+                    {
+                        var pr = panel(rLinks);
+                        float lx = pr.X + pp2;
+                        foreach (var b in links)
+                        {
+                            b.R = new RectangleF((float)Math.Round(lx) + 0.5f, (float)Math.Round(pr.Y + pp2) + 0.5f, b.R.Width, b.R.Height);
+                            if (b.Id == "linkadd") DrawSysIcon(g, b, k); else DrawLinkBtn(g, b, bf, k, b.R.Height);
+                            comp.Btns.Add(b);
+                            lx += b.R.Width + bgap;
+                        }
+                    }
+                    // 위 오른쪽: 설정·압정·최소화·최대화·닫기
+                    if (!rSys.IsEmpty)
+                    {
+                        var pr = panel(rSys);
+                        float sx2 = pr.X + pp2;
+                        foreach (var b in sysBtns)
+                        {
+                            b.R = new RectangleF((float)Math.Round(sx2) + 0.5f, (float)Math.Round(pr.Y + pp2) + 0.5f, b.R.Width, b.R.Height);
+                            DrawSysIcon(g, b, k);
+                            comp.Btns.Add(b);
+                            sx2 += b.R.Width + bgap;
+                        }
                     }
                     sf.Dispose(); sfl.Dispose();
                 }
@@ -873,6 +912,68 @@ namespace ClassroomHud
             if (bf != null) bf.Dispose();
             if (cf != null) cf.Dispose();
             return comp;
+        }
+
+        // 오른쪽 위 아이콘 버튼들 (선으로 그린 아이콘)
+        static void DrawSysIcon(Graphics g, Btn b, float k)
+        {
+            var r = b.R;
+            bool danger = b.Id == "quit";
+            using (var rr = Round(r, 8 * k))
+            {
+                using (var fb = new SolidBrush(b.On ? Accent : Color.White)) g.FillPath(fb, rr);
+                using (var pen = new Pen(b.On ? Accent : Line, Math.Max(1f, k))) g.DrawPath(pen, rr);
+            }
+            Color c = b.On ? Color.White : (danger ? Color.FromArgb(225, 70, 70) : Ink);
+            float cx = r.X + r.Width / 2, cy = r.Y + r.Height / 2, u = r.Width * 0.18f;
+            using (var pen = new Pen(c, Math.Max(1.6f, 2f * k)) { StartCap = LineCap.Round, EndCap = LineCap.Round, LineJoin = LineJoin.Round })
+            using (var br = new SolidBrush(c))
+            {
+                switch (b.Id)
+                {
+                    case "quit":
+                        g.DrawLine(pen, cx - u, cy - u, cx + u, cy + u); g.DrawLine(pen, cx - u, cy + u, cx + u, cy - u); break;
+                    case "hide":
+                        g.DrawLine(pen, cx - u * 1.1f, cy + u * 0.6f, cx + u * 1.1f, cy + u * 0.6f); break;
+                    case "max":
+                        if (b.On)
+                        {   // 원래 크기로 (겹친 네모)
+                            g.DrawRectangle(pen, cx - u * 1.1f, cy - u * 0.5f, u * 1.6f, u * 1.6f);
+                            g.DrawLines(pen, new[] { new PointF(cx - u * 0.5f, cy - u * 0.5f), new PointF(cx - u * 0.5f, cy - u * 1.1f), new PointF(cx + u * 1.1f, cy - u * 1.1f), new PointF(cx + u * 1.1f, cy + u * 0.5f), new PointF(cx + u * 0.5f, cy + u * 0.5f) });
+                        }
+                        else g.DrawRectangle(pen, cx - u * 1.05f, cy - u * 1.05f, u * 2.1f, u * 2.1f);
+                        break;
+                    case "pin":
+                        {
+                            var st0 = g.Save();
+                            g.TranslateTransform(cx, cy); g.RotateTransform(45);
+                            float hw = u * 0.55f;
+                            g.FillRectangle(br, -hw, -u * 1.25f, hw * 2, u * 1.05f);          // 압정 몸통
+                            g.FillRectangle(br, -u * 0.95f, -u * 0.3f, u * 1.9f, u * 0.38f);  // 넓은 머리
+                            g.DrawLine(pen, 0, u * 0.1f, 0, u * 1.3f);                         // 바늘
+                            g.Restore(st0);
+                        }
+                        break;
+                    case "settings":
+                        {
+                            // 톱니바퀴
+                            int n = 8; float ro = u * 1.25f, ri = u * 0.95f;
+                            var pts = new List<PointF>();
+                            for (int i = 0; i < n * 2; i++)
+                            {
+                                double a0 = Math.PI * 2 * i / (n * 2), a1 = Math.PI * 2 * (i + 1) / (n * 2);
+                                float rad = i % 2 == 0 ? ro : ri;
+                                pts.Add(new PointF(cx + (float)Math.Cos(a0 + 0.06) * rad, cy + (float)Math.Sin(a0 + 0.06) * rad));
+                                pts.Add(new PointF(cx + (float)Math.Cos(a1 - 0.06) * rad, cy + (float)Math.Sin(a1 - 0.06) * rad));
+                            }
+                            g.FillPolygon(br, pts.ToArray());
+                            using (var hb = new SolidBrush(b.On ? Accent : Color.White)) g.FillEllipse(hb, cx - u * 0.45f, cy - u * 0.45f, u * 0.9f, u * 0.9f);
+                        }
+                        break;
+                    case "linkadd":
+                        g.DrawLine(pen, cx - u, cy, cx + u, cy); g.DrawLine(pen, cx, cy - u, cx, cy + u); break;
+                }
+            }
         }
 
         // 로고 + 이름 (크롬 북마크처럼)

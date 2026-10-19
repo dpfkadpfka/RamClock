@@ -127,6 +127,9 @@ namespace ClassroomHud
             S.ShowSeconds = true; S.DigitFont = true; st.Hover = false;
             Save(dir + "/10_font_a.png", S, st, new DateTime(2026, 10, 8, 11, 11, 11), work, 0);
             Save(dir + "/10_font_b.png", S, st, new DateTime(2026, 10, 8, 10, 48, 08), work, 0);
+            testTop = 70; st.Hover = true; st.Popup = 0; S.Mode = 1; S.DigitFont = false; S.Memo = "오늘 준비물: 색연필";
+            Save(dir + "/12_layout.png", S, st, t, new Rectangle(0, 0, 900, 700), 1);
+            testTop = 30; S.Mode = 0; S.Memo = "";
             var S5 = Settings.Defaults(); S5.FontName = "★ 주아"; S5.ClockFontName = "★ 검은고딕"; S5.DigitFont = true; S5.MemoFont = "★ 개구 손글씨";
             S5.Memo = "오늘 준비물: 색연필, 가위\n5교시 강당 이동"; S5.MemoBgOn = true; S5.MemoBgColor = "#FFD3E0";
             var st5 = new HudState { Hover = true };
@@ -244,9 +247,10 @@ namespace ClassroomHud
             Application.Run(pf);
         }
 
+        static int testTop = 30;
         static void Save(string path, Settings S, HudState st, DateTime t, Rectangle work, int bg)
         {
-            var c = Painter.Compose(S, st, t, 1f, 450, 30, work);
+            var c = Painter.Compose(S, st, t, 1f, 450, testTop, work);
             using (var canvas = new Bitmap(900, Math.Max(c.Win.Bottom + 30, 260)))
             using (var g = Graphics.FromImage(canvas))
             {
