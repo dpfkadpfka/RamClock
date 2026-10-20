@@ -46,6 +46,7 @@ namespace ClassroomHud
         public List<long> Laps = new List<long>();
         public float StickW; public string StickKey;
         public bool Maximized; public int MaxPrevX, MaxPrevY; public float MaxPrevScale;   // 크게 보기
+        public bool MusicOpen;                        // 음악 미니 플레이어가 열려 있음
         public bool MemoEdit;                         // 위젯에서 바로 메모를 쓰는 중   // 폭이 매초 바뀌어 흔들리지 않도록
 
         public long WElapsed(DateTime now) { return WBase + (WRun ? (long)(now - WStart).TotalMilliseconds : 0); }
@@ -504,7 +505,7 @@ namespace ClassroomHud
             var tools = new List<Btn>();
             foreach (var t in Settings.ToolList)
                 if (S.Tools == null || S.Tools.Contains(t[0]))
-                    tools.Add(B(t[0], t[1], (t[0] == "msgs" && st.Popup == 2) || (t[0] == "memo" && st.MemoEdit)));
+                    tools.Add(B(t[0], t[1], (t[0] == "msgs" && st.Popup == 2) || (t[0] == "memo" && st.MemoEdit) || (t[0] == "music" && st.MusicOpen)));
             if (tools.Count > 0) { var gt = G(null, false, tools.ToArray()); gt.Slot = "tools"; gs.Add(gt); }
 
             if (S.Mode == 1)

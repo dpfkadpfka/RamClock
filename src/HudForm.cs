@@ -135,6 +135,7 @@ namespace ClassroomHud
             comp = c;
             Push(c.Bmp, c.Win.Location);
             if (memoEd != null && !memoEd.IsDisposed) memoEd.Place(c.Content, c.MemoY);
+            FollowMusic(c.Content);
         }
 
         void Push(Bitmap bmp, Point pos)
@@ -402,7 +403,9 @@ namespace ClassroomHud
                 {
                     string u = (S.Links[i].Url ?? "").Trim();
                     if (u.Length > 0 && !u.Contains("://") && !System.IO.File.Exists(u) && !System.IO.Directory.Exists(u)) u = "https://" + u;
-                    if (!OpenSmall(u)) { try { System.Diagnostics.Process.Start(u); } catch (Exception ex) { Program.Log(ex); } }
+                    string hh = LinkIcons.Host(u) ?? "";
+                    if (hh.EndsWith("youtube.com") || hh.EndsWith("youtu.be")) OpenMusic(u);
+                    else if (!OpenSmall(u)) { try { System.Diagnostics.Process.Start(u); } catch (Exception ex) { Program.Log(ex); } }
                 }
                 st.Hover = false; st.Popup = 0; ver++; Render(true);
                 return;
@@ -425,6 +428,7 @@ namespace ClassroomHud
                 case "pick": OpenPicker(); return;
                 case "week": OpenWeek(); return;
                 case "memo": OpenMemo(); return;
+                case "music": OpenMusic(null); return;
                 case "msgs": st.Popup = st.Popup == 2 ? 0 : 2; break;
                 case "readable": S.Readable = !S.Readable; S.Save(); break;
                 case "lock": S.Locked = !S.Locked; S.Save(); break;
@@ -452,6 +456,7 @@ namespace ClassroomHud
                     S.TopMostOn = !S.TopMostOn; S.Save();
                     TopMost = S.TopMostOn;
                     try { SetWindowPos(Handle, new IntPtr(S.TopMostOn ? -1 : -2), 0, 0, 0, 0, 0x0001 | 0x0002 | 0x0010); } catch { }
+                    MusicTop();
                     break;
                 case "cpick": PickColor(); return;
                 case "tm-":
@@ -619,6 +624,7 @@ namespace ClassroomHud
             if (t == null || t == S) return;
             if (t.X != int.MinValue) { t.X = S.X; t.Y = S.Y; t.Scale = S.Scale; }
             t.Mode = S.Mode;
+            t.Playlists = S.Playlists; t.MusicLast = S.MusicLast; t.MusicW = S.MusicW; t.MusicH = S.MusicH; t.MusicDX = S.MusicDX; t.MusicDY = S.MusicDY; t.MusicToolAdded = S.MusicToolAdded;
             if (t == previewS && previewFromMemo) return;
             t.Memo = S.Memo; t.MemoColor = S.MemoColor; t.MemoBgOn = S.MemoBgOn; t.MemoBgColor = S.MemoBgColor; t.MemoBgOpacity = S.MemoBgOpacity;
             t.MemoFont = S.MemoFont; t.MemoSize = S.MemoSize; t.MemoBold = S.MemoBold; t.MemoOutline = S.MemoOutline; t.MemoOutlineColor = S.MemoOutlineColor;
@@ -750,6 +756,65 @@ namespace ClassroomHud
                 return true;
             }
             catch (Exception ex) { Program.Log(ex); return false; }
+        }
+
+        // ---------- 유튜브 미니 플레이어 (시계 위에 붙어 다님) ----------
+        Form music;
+        void OpenMusic(string url)
+        {
+            st.Hover = false; st.Popup = 0;
+            if (music != null && !music.IsDisposed)
+            {
+                if (url != null) MusicPlay(url);
+                else { music.Show(); music.BringToFront(); }
+                ver++; Render(true);
+                return;
+            }
+            string why;
+            if (!Wv2.Available(out why))
+            {
+                // 엣지 엔진이 없으면 예전처럼 작은 브라우저 창으로
+                if (!OpenSmall(url ?? MusicFallbackUrl())) try { System.Diagnostics.Process.Start(url ?? "https://music.youtube.com"); } catch { }
+                tray.ShowBalloonTip(6000, "RamClock", "이 컴퓨터에는 미니 플레이어용 WebView2가 없어 브라우저 창으로 열었어요.\n" + why, ToolTipIcon.Info);
+                return;
+            }
+            try { music = MakeMusic(url); }
+            catch (Exception ex) { Program.Log(ex); if (!OpenSmall(url ?? MusicFallbackUrl())) try { System.Diagnostics.Process.Start(url ?? "https://music.youtube.com"); } catch { } return; }
+            st.MusicOpen = true;
+            ver++; Render(true);
+        }
+        static string MusicFallbackUrl() { return "https://music.youtube.com"; }
+
+        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+        Form MakeMusic(string url)
+        {
+            var f = new MusicForm(() => S, () => comp != null ? comp.Content : Rectangle.Empty, dpiK);
+            if (url != null) f.Play(url);
+            f.FormClosed += (o, e) => { music = null; st.MusicOpen = false; ver++; Render(true); };
+            f.SetTop(S.TopMostOn);
+            if (comp != null) f.Follow(comp.Content);
+            f.Show(this);
+            return f;
+        }
+        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+        void MusicPlay(string url) { ((MusicForm)music).Play(url); music.Show(); }
+        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+        void MusicFollow(Rectangle c) { ((MusicForm)music).Follow(c); }
+        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+        void MusicTopCore() { ((MusicForm)music).SetTop(S.TopMostOn); }
+        void MusicTop() { if (music != null && !music.IsDisposed) try { MusicTopCore(); } catch { } }
+        void FollowMusic(Rectangle c) { if (music != null && !music.IsDisposed && music.Visible) try { MusicFollow(c); } catch { } }
+
+        // 시계를 끄는 동안에도 플레이어가 같이 따라오게
+        protected override void OnMove(EventArgs e)
+        {
+            base.OnMove(e);
+            if (dragging && comp != null && music != null)
+            {
+                var c = comp.Content;
+                c.Offset(Left - comp.Win.Left, Top - comp.Win.Top);
+                FollowMusic(c);
+            }
         }
 
         // 바로가기 줄의 [+]: 주소 넣는 작은 창

@@ -12,12 +12,16 @@ namespace ClassroomHud
         readonly TextBox tUrl, tName;
         bool nameTouched;
 
-        public LinkDialog(QuickLink cur)
+        public LinkDialog(QuickLink cur) : this(cur, null) { }
+
+        // playlist=true: 재생목록 저장용 (유튜브 주소 + 이름)
+        public LinkDialog(QuickLink cur, string playlistTitle)
         {
+            bool pl = playlistTitle != null;
             AutoScaleDimensions = new SizeF(96F, 96F);
             AutoScaleMode = AutoScaleMode.Dpi;
             Font = Media.UiFont(10F);
-            Text = cur == null ? "바로가기 추가" : "바로가기 고치기";
+            Text = pl ? playlistTitle : cur == null ? "바로가기 추가" : "바로가기 고치기";
             FormBorderStyle = FormBorderStyle.FixedDialog;
             MaximizeBox = MinimizeBox = false;
             StartPosition = FormStartPosition.CenterScreen;
@@ -26,7 +30,7 @@ namespace ClassroomHud
             try { Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath); } catch { }
             var t = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, Padding = new Padding(16, 12, 16, 12) };
             for (int i = 0; i < 6; i++) t.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-            t.Controls.Add(new Label { Text = "사이트 주소 (예: www.youtube.com)", AutoSize = true });
+            t.Controls.Add(new Label { Text = pl ? "유튜브·유튜브 뮤직 주소 (재생목록이나 영상 주소)" : "사이트 주소 (예: www.youtube.com)", AutoSize = true });
             var urlRow = new FlowLayoutPanel { AutoSize = true, Dock = DockStyle.Fill, WrapContents = false, Margin = new Padding(0) };
             tUrl = new TextBox { Width = 320, Text = cur != null ? cur.Url : "", Margin = new Padding(3, 3, 6, 3) };
             var bFile = new GButton { Text = "파일·프로그램…", AutoSize = true, MinimumSize = new Size(0, 30) };
@@ -35,22 +39,22 @@ namespace ClassroomHud
                 using (var od = new OpenFileDialog { Title = "자주 여는 파일이나 프로그램 고르기", Filter = "모든 파일|*.*" })
                     if (od.ShowDialog(this) == DialogResult.OK) { tUrl.Text = od.FileName; if (!nameTouched) tName.Text = Path.GetFileNameWithoutExtension(od.FileName); }
             };
-            urlRow.Controls.Add(tUrl); urlRow.Controls.Add(bFile);
+            urlRow.Controls.Add(tUrl); if (!pl) urlRow.Controls.Add(bFile); else tUrl.Width = 420;
             t.Controls.Add(urlRow);
             t.Controls.Add(new Label { Text = "이름 (비워 두면 알아서 정해요)", AutoSize = true, Margin = new Padding(3, 12, 3, 3) });
-            tName = new TextBox { Width = 320, Text = cur != null ? cur.Name : "" };
-            nameTouched = cur != null;
+            tName = new TextBox { Width = pl ? 420 : 320, Text = cur != null ? cur.Name : "" };
+            nameTouched = cur != null && !string.IsNullOrEmpty(cur.Name);
             tName.KeyPress += (o, e) => nameTouched = true;
-            tUrl.TextChanged += (o, e) => { if (!nameTouched) tName.Text = AutoName(tUrl.Text); };
+            tUrl.TextChanged += (o, e) => { if (!nameTouched && !pl) tName.Text = AutoName(tUrl.Text); };
             t.Controls.Add(tName);
             var bottom = new FlowLayoutPanel { AutoSize = true, FlowDirection = FlowDirection.RightToLeft, Dock = DockStyle.Fill, Margin = new Padding(0, 14, 0, 0) };
-            var bOk = new GButton { Text = cur == null ? "추가" : "확인", AutoSize = true, MinimumSize = new Size(90, 34), Tag = "primary" };
+            var bOk = new GButton { Text = pl ? "저장" : cur == null ? "추가" : "확인", AutoSize = true, MinimumSize = new Size(90, 34), Tag = "primary" };
             var bCancel = new GButton { Text = "취소", AutoSize = true, MinimumSize = new Size(90, 34), DialogResult = DialogResult.Cancel };
             bOk.Click += (o, e) =>
             {
                 string u = tUrl.Text.Trim();
                 if (u.Length == 0 || u == "https://") { tUrl.Focus(); return; }
-                string n = tName.Text.Trim(); if (n.Length == 0) n = AutoName(u);
+                string n = tName.Text.Trim(); if (n.Length == 0) n = pl ? "내 재생목록" : AutoName(u);
                 Result = new QuickLink(n, u);
                 DialogResult = DialogResult.OK; Close();
             };
