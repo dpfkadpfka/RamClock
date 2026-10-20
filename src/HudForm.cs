@@ -402,7 +402,7 @@ namespace ClassroomHud
                 {
                     string u = (S.Links[i].Url ?? "").Trim();
                     if (u.Length > 0 && !u.Contains("://") && !System.IO.File.Exists(u) && !System.IO.Directory.Exists(u)) u = "https://" + u;
-                    try { System.Diagnostics.Process.Start(u); } catch (Exception ex) { Program.Log(ex); }
+                    if (!OpenSmall(u)) { try { System.Diagnostics.Process.Start(u); } catch (Exception ex) { Program.Log(ex); } }
                 }
                 st.Hover = false; st.Popup = 0; ver++; Render(true);
                 return;
@@ -711,6 +711,45 @@ namespace ClassroomHud
                 ver++; BeginInvoke(new Action(() => Render(true)));
             }
             lastState = WindowState;
+        }
+
+        // 유튜브는 주소창·탭 없는 작은 창(앱 모드)으로: 오른쪽 아래에 띄워 노래만 틀어 두기 좋게
+        static string BrowserPath(string exe)
+        {
+            foreach (var root in new[] { Microsoft.Win32.Registry.CurrentUser, Microsoft.Win32.Registry.LocalMachine })
+            {
+                try
+                {
+                    using (var k = root.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\" + exe))
+                    {
+                        var v = k != null ? k.GetValue("") as string : null;
+                        if (!string.IsNullOrEmpty(v) && System.IO.File.Exists(v.Trim('"'))) return v.Trim('"');
+                    }
+                }
+                catch { }
+            }
+            foreach (var p in new[] {
+                Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86) + @"\Microsoft\Edge\Application\msedge.exe",
+                Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles) + @"\Microsoft\Edge\Application\msedge.exe" })
+                if (exe == "msedge.exe" && System.IO.File.Exists(p)) return p;
+            return null;
+        }
+
+        bool OpenSmall(string url)
+        {
+            string host = LinkIcons.Host(url) ?? "";
+            if (!(host.EndsWith("youtube.com") || host.EndsWith("youtu.be") || host.EndsWith("music.youtube.com"))) return false;
+            string br = BrowserPath("chrome.exe") ?? BrowserPath("msedge.exe");
+            if (br == null) return false;
+            try
+            {
+                var wa = Screen.FromPoint(new Point(S.X, S.Y)).WorkingArea;
+                int w = 560, h = 360;
+                int x = wa.Right - w - 16, y = wa.Bottom - h - 16;
+                System.Diagnostics.Process.Start(br, "--app=\"" + url + "\" --window-size=" + w + "," + h + " --window-position=" + x + "," + y);
+                return true;
+            }
+            catch (Exception ex) { Program.Log(ex); return false; }
         }
 
         // 바로가기 줄의 [+]: 주소 넣는 작은 창
