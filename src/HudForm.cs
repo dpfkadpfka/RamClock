@@ -403,9 +403,8 @@ namespace ClassroomHud
                 {
                     string u = (S.Links[i].Url ?? "").Trim();
                     if (u.Length > 0 && !u.Contains("://") && !System.IO.File.Exists(u) && !System.IO.Directory.Exists(u)) u = "https://" + u;
-                    string hh = LinkIcons.Host(u) ?? "";
-                    if (hh.EndsWith("youtube.com") || hh.EndsWith("youtu.be")) OpenMusic(u);
-                    else if (!OpenSmall(u)) { try { System.Diagnostics.Process.Start(u); } catch (Exception ex) { Program.Log(ex); } }
+                    // 위쪽 바로가기는 늘 쓰는 웹 브라우저로 (유튜브 뮤직 플레이어는 [음악] 버튼으로만)
+                    { try { System.Diagnostics.Process.Start(u); } catch (Exception ex) { Program.Log(ex); } }
                 }
                 st.Hover = false; st.Popup = 0; ver++; Render(true);
                 return;

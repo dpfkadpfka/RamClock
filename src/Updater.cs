@@ -12,7 +12,7 @@ namespace ClassroomHud
     public static class Updater
     {
         public const string Repo = "dpfkadpfka/RamClock";
-        public const string Version = "1.0.14";   // 릴리스 때 태그 번호로 바뀜
+        public const string Version = "1.0.15";   // 릴리스 때 태그 번호로 바뀜
         public static Action<string> Ready;      // 새 버전 받아 둠 → 알림
 
         static string Exe { get { return Application.ExecutablePath; } }
@@ -65,7 +65,7 @@ namespace ClassroomHud
                         msg = r == null ? "지금 쓰는 v" + Version + "이 최신 버전이에요." : "새 버전 v" + r + "을 받았어요. [지금 업데이트]를 누르면 바로 바뀌어요.";
                     }
                 }
-                catch (Exception ex) { Program.Log(ex); msg = "업데이트를 확인하지 못했어요. 인터넷 연결을 확인해 주세요."; }
+                catch (Exception ex) { Program.Log(ex); msg = "업데이트를 확인하지 못했어요.\n(" + ex.Message + ")"; }
                 if (report != null) report(msg);
             }) { IsBackground = true }.Start();
         }
@@ -81,17 +81,22 @@ namespace ClassroomHud
         {
             if (Pending != null) return Pending;
             ServicePointManager.SecurityProtocol |= (SecurityProtocolType)3072;
-            string json;
-            using (var wc = new WebClient())
+            // 1) github.com/…/releases/latest 가 넘겨주는 주소에서 버전 읽기 (API처럼 횟수 제한이 없어 학교처럼 여럿이 같은 인터넷을 써도 됨)
+            string tag = LatestTagByRedirect();
+            if (string.IsNullOrEmpty(tag))
             {
-                wc.Headers[HttpRequestHeader.UserAgent] = "RamClock";
-                wc.Encoding = System.Text.Encoding.UTF8;
-                json = wc.DownloadString("https://api.github.com/repos/" + Repo + "/releases/latest");
+                // 2) 안 되면 API로
+                string json;
+                using (var wc = new WebClient())
+                {
+                    wc.Headers[HttpRequestHeader.UserAgent] = "RamClock";
+                    wc.Encoding = System.Text.Encoding.UTF8;
+                    json = wc.DownloadString("https://api.github.com/repos/" + Repo + "/releases/latest");
+                }
+                tag = Regex.Match(json, "\"tag_name\"\\s*:\\s*\"([^\"]+)\"").Groups[1].Value;
             }
-            var tag = Regex.Match(json, "\"tag_name\"\\s*:\\s*\"([^\"]+)\"").Groups[1].Value;
             if (tag.Length == 0 || !Newer(tag, Version)) return null;
-            var url = Regex.Match(json, "\"browser_download_url\"\\s*:\\s*\"([^\"]+RamClock\\.exe)\"").Groups[1].Value;
-            if (url.Length == 0) return null;
+            var url = "https://github.com/" + Repo + "/releases/download/" + tag + "/RamClock.exe";
 
             string dir = Path.GetDirectoryName(Exe), tmp = Path.Combine(dir, "RamClock.download");
             using (var wc = new WebClient()) { wc.Headers[HttpRequestHeader.UserAgent] = "RamClock"; wc.DownloadFile(url, tmp); }
@@ -107,6 +112,22 @@ namespace ClassroomHud
             Pending = tag.TrimStart('v', 'V');
             var r = Ready; if (r != null) r(Pending);
             return Pending;
+        }
+
+        static string LatestTagByRedirect()
+        {
+            try
+            {
+                var req = (HttpWebRequest)WebRequest.Create("https://github.com/" + Repo + "/releases/latest");
+                req.AllowAutoRedirect = false; req.Method = "HEAD"; req.UserAgent = "RamClock"; req.Timeout = 15000;
+                using (var resp = (HttpWebResponse)req.GetResponse())
+                {
+                    string loc = resp.Headers["Location"] ?? "";
+                    int i = loc.LastIndexOf("/tag/");
+                    return i >= 0 ? Uri.UnescapeDataString(loc.Substring(i + 5)).Trim('/') : null;
+                }
+            }
+            catch (Exception ex) { Program.Log(ex); return null; }
         }
 
         // 바로 새 버전으로 다시 켜기
