@@ -638,7 +638,7 @@ namespace ClassroomHud
             Audio.ApplyVoice(S.VoiceName, S.VoiceRate, S.VoiceVolume);
             EnsurePosition();
             S.Save();
-            TopMost = S.TopMostOn;
+            Raise();   // 설정 창이 열려 있으면 시계를 앞으로 올리지 않음
             ApplyAutoStart();
             lastSec = -1; lastDayKey = "";
             ver++; Render(true);
