@@ -14,7 +14,7 @@ namespace ClassroomHud
     {
         public const string Home = "https://music.youtube.com";
         readonly Func<Settings> getS;
-        readonly Action relayout;
+        readonly Func<Rectangle> getContent;
         readonly Panel head;
         readonly WebView2 web;
         readonly List<HeadBtn> btns = new List<HeadBtn>();
@@ -30,12 +30,9 @@ namespace ClassroomHud
 
         class HeadBtn { public string Id, Glyph, Tip; public Rectangle R; }
 
-        readonly Action dragClock;
-        bool below;   // 시계 위에 자리가 없어 아래에 붙었는지
-
-        public MusicForm(Func<Settings> getS, Action relayout, float dpiK, Action dragClock)
+        public MusicForm(Func<Settings> getS, Func<Rectangle> getContent, float dpiK)
         {
-            this.getS = getS; this.relayout = relayout; k = Math.Max(1f, dpiK); this.dragClock = dragClock;
+            this.getS = getS; this.getContent = getContent; k = Math.Max(1f, dpiK);
             FormBorderStyle = FormBorderStyle.None;
             ShowInTaskbar = false;
             StartPosition = FormStartPosition.Manual;
@@ -75,8 +72,8 @@ namespace ClassroomHud
             Controls.Add(web);
             Controls.Add(head);
             LayoutBtns();
-            ResizeEnd += (o, e) => { if (!folded) { S.MusicH = Height; S.Save(); } relayout(); };
             HandleCreated += (o, e) => { try { int v = 2; DwmSetWindowAttribute(Handle, 33, ref v, 4); } catch { } };   // 윈11 둥근 모서리
+            ResizeEnd += (o, e) => { if (!folded) { S.MusicW = Width; S.MusicH = Height; S.Save(); } };
             InitWeb();
         }
 
@@ -199,8 +196,11 @@ namespace ClassroomHud
             if (e.Button != MouseButtons.Left) return;
             var b = btns.Find(x => x.R.Contains(e.Location));
             if (b != null) { HeadClick(b.Id); return; }
-            // 머리줄을 끌면 시계째로 같이 움직임 (플레이어는 시계의 한 부분)
-            if (dragClock != null) dragClock();
+            // 머리줄을 끌면 시계에 붙은 자리가 바뀜
+            ReleaseCapture();
+            SendMessage(Handle, 0xA1, new IntPtr(2), IntPtr.Zero);
+            var c = getContent();
+            if (!c.IsEmpty) { S.MusicDX = Left - c.Left; S.MusicDY = Top - c.Top; S.Save(); }
         }
 
         void HeadClick(string id)
@@ -265,19 +265,27 @@ namespace ClassroomHud
             web.Visible = !f;
             if (f) { MinimumSize = new Size(MinimumSize.Width, 0); Height = HeadH + 2 * Pad; }
             else Height = S.MusicH > 0 ? S.MusicH : (int)(320 * k);
-            relayout();
+            Follow(getContent());
             head.Invalidate();
         }
 
         // ---------- 시계에 붙어 다니기 ----------
-        // 시계가 정해 준 자리(시계 폭, 바로 위 또는 아래)에 붙기
-        bool sizing;
-        public int LayoutH { get { return folded ? HeadH + 2 * Pad : (S.MusicH > 0 ? S.MusicH : (int)(320 * k)); } }
-        public void Follow(Rectangle r, bool isBelow)
+        public void Follow(Rectangle c)
         {
-            if (r.IsEmpty || IsDisposed || sizing) return;
-            below = isBelow;
-            if (Bounds != r) Bounds = r;
+            if (c.IsEmpty || IsDisposed) return;
+            var wa = Screen.FromRectangle(c).WorkingArea;
+            int x, y;
+            if (S.MusicDX == int.MinValue)
+            {
+                // 처음: 시계 바로 위, 오른쪽 끝을 맞춰서 (위에 자리가 없으면 아래)
+                x = c.Right - Width;
+                y = c.Top - (folded ? HeadH + 2 * Pad : Height) - (int)(6 * k);
+                if (y < wa.Top) y = c.Bottom + (int)(6 * k);
+            }
+            else { x = c.Left + S.MusicDX; y = c.Top + S.MusicDY; }
+            x = Math.Max(wa.Left, Math.Min(wa.Right - Width, x));
+            y = Math.Max(wa.Top, Math.Min(wa.Bottom - Height, y));
+            if (Left != x || Top != y) Location = new Point(x, y);
         }
 
         public void SetTop(bool on) { try { TopMost = on; } catch { } }
@@ -285,18 +293,17 @@ namespace ClassroomHud
         // 테두리 근처는 크기 조절
         protected override void WndProc(ref Message m)
         {
-            if (m.Msg == 0x231) sizing = true;
-            else if (m.Msg == 0x232) sizing = false;
             base.WndProc(ref m);
             if (m.Msg == 0x84 /*NCHITTEST*/ && (int)m.Result == 1)
             {
                 var p = PointToClient(new Point((short)((long)m.LParam & 0xFFFF), (short)(((long)m.LParam >> 16) & 0xFFFF)));
                 int e = Pad + 2;
                 bool L = p.X < e, R = p.X >= ClientSize.Width - e, T = p.Y < e, B = p.Y >= ClientSize.Height - e;
-                // 폭은 시계를 따라가고, 시계 반대쪽 끝만 끌어서 높이 조절
-                if (folded) return;
-                if (!below && T) m.Result = (IntPtr)12;
-                else if (below && B) m.Result = (IntPtr)15;
+                if (folded) { T = B = false; }
+                if (T && L) m.Result = (IntPtr)13; else if (T && R) m.Result = (IntPtr)14;
+                else if (B && L) m.Result = (IntPtr)16; else if (B && R) m.Result = (IntPtr)17;
+                else if (L) m.Result = (IntPtr)10; else if (R) m.Result = (IntPtr)11;
+                else if (T) m.Result = (IntPtr)12; else if (B) m.Result = (IntPtr)15;
             }
         }
 
