@@ -16,6 +16,7 @@ namespace ClassroomHud
         public Color? Swatch;
         public Image Icon;
         public bool Round;     // 동그란 아이콘 버튼 (메모 수정·삭제)
+        public bool Glyph;     // 글자 대신 아이콘만 (모드·교실 도구)
     }
 
     public class Grp
@@ -502,10 +503,12 @@ namespace ClassroomHud
         {
             var gs = new List<Grp>();
             var gm = G(null, false, B("m0", "시간표", S.Mode == 0), B("m1", "타이머", S.Mode == 1), B("m2", "스톱워치", S.Mode == 2)); gm.Slot = "mode"; gs.Add(gm);
+            foreach (var b0 in gm.Btns) b0.Glyph = true;
             var tools = new List<Btn>();
             foreach (var t in Settings.ToolList)
                 if (S.Tools == null || S.Tools.Contains(t[0]))
                     tools.Add(B(t[0], t[1], (t[0] == "msgs" && st.Popup == 2) || (t[0] == "memo" && st.MemoEdit) || (t[0] == "music" && st.MusicOpen)));
+            foreach (var b0 in tools) b0.Glyph = true;
             if (tools.Count > 0) { var gt = G(null, false, tools.ToArray()); gt.Slot = "tools"; gs.Add(gt); }
 
             if (S.Mode == 1)
@@ -636,7 +639,7 @@ namespace ClassroomHud
                     var cur = new List<Btn>(); float cwid = 0;
                     foreach (var b in grp.Btns)
                     {
-                        float bw = b.Swatch.HasValue ? bh : MG.MeasureString(b.Text, bf, PointF.Empty, StringFormat.GenericTypographic).Width + 22 * k;
+                        float bw = b.Swatch.HasValue ? bh : b.Glyph ? (float)Math.Round(bh * 1.15f) : MG.MeasureString(b.Text, bf, PointF.Empty, StringFormat.GenericTypographic).Width + 22 * k;
                         b.R = new RectangleF(0, 0, bw, bh);
                         float add = (cur.Count > 0 ? bgap : 0) + bw;
                         if (cur.Count > 0 && cwid + add > inner) { grp.Lines.Add(cur); grp.LineW.Add(cwid); cur = new List<Btn>(); cwid = 0; add = bw; }
@@ -1026,6 +1029,54 @@ namespace ClassroomHud
             }
         }
 
+        // 모드·교실 도구 아이콘 (24칸 격자에 선으로 그림)
+        static void DrawToolIcon(Graphics g, string id, RectangleF r, Color c, float k)
+        {
+            float isz = r.Height * 0.76f, f = isz / 24f;
+            float ox = r.X + (r.Width - isz) / 2f, oy = r.Y + (r.Height - isz) / 2f;
+            Func<float, float, PointF> P = (x, y) => new PointF(ox + x * f, oy + y * f);
+            var sm = g.SmoothingMode; g.SmoothingMode = SmoothingMode.AntiAlias;
+            using (var pen = new Pen(c, Math.Max(1.5f, 2f * f)) { StartCap = LineCap.Round, EndCap = LineCap.Round, LineJoin = LineJoin.Round })
+            using (var br = new SolidBrush(c))
+            {
+                Action<float, float, float, float> L = (x1, y1, x2, y2) => g.DrawLine(pen, P(x1, y1), P(x2, y2));
+                Action<float[]> PL = a => { var pts = new PointF[a.Length / 2]; for (int i = 0; i < pts.Length; i++) pts[i] = P(a[2 * i], a[2 * i + 1]); g.DrawLines(pen, pts); };
+                Action<float, float, float, float, float> RR = (x, y, w, h, rad) => { using (var p = Round(new RectangleF(P(x, y), new SizeF(w * f, h * f)), rad * f)) g.DrawPath(pen, p); };
+                Action<float, float, float> CI = (x, y, rad) => g.DrawEllipse(pen, ox + (x - rad) * f, oy + (y - rad) * f, rad * 2 * f, rad * 2 * f);
+                Action<float, float, float> DOT = (x, y, rad) => g.FillEllipse(br, ox + (x - rad) * f, oy + (y - rad) * f, rad * 2 * f, rad * 2 * f);
+                Action<float, float, float, float, float> ARC = (x, y, rad, a0, sw) => g.DrawArc(pen, ox + (x - rad) * f, oy + (y - rad) * f, rad * 2 * f, rad * 2 * f, a0, sw);
+                switch (id)
+                {
+                    case "m0":   // 시간표: 달력 칸
+                        RR(3, 4, 18, 17, 2.5f); L(3, 9.5f, 21, 9.5f); L(8, 2.5f, 8, 5.5f); L(16, 2.5f, 16, 5.5f);
+                        L(8.5f, 13, 10.5f, 13); L(13.5f, 13, 15.5f, 13); L(8.5f, 17, 10.5f, 17); L(13.5f, 17, 15.5f, 17); break;
+                    case "m1":   // 타이머: 모래시계
+                        L(6, 2.5f, 18, 2.5f); L(6, 21.5f, 18, 21.5f);
+                        PL(new float[] { 7, 2.5f, 7, 6, 9.5f, 10.3f, 12, 12, 14.5f, 10.3f, 17, 6, 17, 2.5f });
+                        PL(new float[] { 7, 21.5f, 7, 18, 9.5f, 13.7f, 12, 12, 14.5f, 13.7f, 17, 18, 17, 21.5f });
+                        L(9.5f, 19.5f, 14.5f, 19.5f); break;
+                    case "m2":   // 스톱워치
+                        CI(12, 13.5f, 7.5f); L(10, 2.5f, 14, 2.5f); L(12, 2.5f, 12, 6); L(12, 13.5f, 15, 10.5f); L(18.5f, 6.5f, 20, 5); break;
+                    case "pick": // 뽑기: 주사위
+                        RR(3.5f, 3.5f, 17, 17, 3.5f);
+                        DOT(8.3f, 8.3f, 1.3f); DOT(15.7f, 8.3f, 1.3f); DOT(12, 12, 1.3f); DOT(8.3f, 15.7f, 1.3f); DOT(15.7f, 15.7f, 1.3f); break;
+                    case "memo": // 텍스트: T + 연필
+                        PL(new float[] { 4, 5.5f, 4, 4, 15, 4, 15, 5.5f }); L(9.5f, 4, 9.5f, 18); L(7.5f, 18, 11.5f, 18);
+                        { var pts = new[] { P(14, 20), P(15, 16.5f), P(20.5f, 11), P(23, 13.5f), P(17.5f, 19) }; g.DrawPolygon(pen, pts); }
+                        break;
+                    case "music": // 음악: 음표
+                        PL(new float[] { 9, 18, 9, 5.5f, 20, 3, 20, 15.5f }); CI(6.5f, 18, 2.5f); CI(17.5f, 15.5f, 2.5f); break;
+                    case "msgs": // 선생님 안내: 확성기
+                        { var pts = new[] { P(3.5f, 10), P(3.5f, 14), P(6.5f, 14), P(13.5f, 18.5f), P(13.5f, 5.5f), P(6.5f, 10) }; g.DrawPolygon(pen, pts); }
+                        ARC(14.35f, 12, 4, -48.6f, 97.2f); ARC(14.4f, 12, 7.5f, -47.2f, 94.4f); break;
+                    case "week": // 이번 주: 달력 + 체크
+                        RR(3, 4, 18, 17, 2.5f); L(3, 9.5f, 21, 9.5f); L(8, 2.5f, 8, 5.5f); L(16, 2.5f, 16, 5.5f);
+                        PL(new float[] { 8.5f, 15, 11, 17.5f, 15.5f, 13 }); break;
+                }
+            }
+            g.SmoothingMode = sm;
+        }
+
         static void DrawBtn(Graphics g, Btn b, Font bf, StringFormat sf, float k, float bh)
         {
             if (b.Swatch.HasValue)
@@ -1041,6 +1092,7 @@ namespace ClassroomHud
                 using (var fb = new SolidBrush(b.On ? Accent : Color.White)) g.FillPath(fb, rr);
                 using (var pen = new Pen(b.On ? Accent : Line, Math.Max(1f, k))) g.DrawPath(pen, rr);
             }
+            if (b.Glyph) { DrawToolIcon(g, b.Id, b.R, b.On ? Color.White : Ink, k); return; }
             var tsz = g.MeasureString(b.Text, bf, PointF.Empty, StringFormat.GenericTypographic);
             float tx = (float)Math.Round(b.R.X + (b.R.Width - tsz.Width) / 2f), ty = (float)Math.Round(b.R.Y + (b.R.Height - tsz.Height) / 2f);
             using (var tb2 = new SolidBrush(b.On ? Color.White : Ink)) g.DrawString(b.Text, bf, tb2, tx, ty, StringFormat.GenericTypographic);
