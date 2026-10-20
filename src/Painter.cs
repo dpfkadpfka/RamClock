@@ -48,6 +48,7 @@ namespace ClassroomHud
         public float StickW; public string StickKey;
         public bool Maximized; public int MaxPrevX, MaxPrevY; public float MaxPrevScale;   // 크게 보기
         public bool MusicOpen;                        // 음악 미니 플레이어가 열려 있음
+        public int MusicH, MusicMinW;                 // 플레이어 높이·최소 폭 (0이면 닫힘)
         public bool MemoEdit;                         // 위젯에서 바로 메모를 쓰는 중   // 폭이 매초 바뀌어 흔들리지 않도록
 
         public long WElapsed(DateTime now) { return WBase + (WRun ? (long)(now - WStart).TotalMilliseconds : 0); }
@@ -61,6 +62,7 @@ namespace ClassroomHud
         public Bitmap Bmp;
         public Rectangle Win;
         public Rectangle Content;
+        public Rectangle Music;                             // 음악 플레이어가 붙을 자리 (시계 위, 자리 없으면 아래)
         public List<Btn> Btns = new List<Btn>();
         public RectangleF Banner = RectangleF.Empty;
         public int MemoY;                                   // 메모가 놓이는 화면 y
@@ -675,6 +677,16 @@ namespace ClassroomHud
             int CW = (int)Math.Ceiling(cw), CH = (int)Math.Ceiling(ch);
             if ((CW & 1) == 1) CW++;
             var content = new Rectangle(cx - CW / 2, top, CW, CH);
+            // 음악 플레이어 자리: 시계 폭에 맞춰 바로 위 (위에 자리가 없으면 바로 아래), 버튼 줄은 그 바깥으로
+            Rectangle mus = Rectangle.Empty;
+            if (st.MusicH > 0)
+            {
+                int mw = Math.Max(st.MusicMinW, content.Width), mgap = (int)(4 * k);
+                int my = content.Top - mgap - st.MusicH;
+                if (my < work.Top) my = content.Bottom + mgap;
+                mus = new Rectangle(content.Left + (content.Width - mw) / 2, my, mw, st.MusicH);
+            }
+            bool musAbove = !mus.IsEmpty && mus.Top < content.Top, musBelow = !mus.IsEmpty && !musAbove;
             Rectangle tb = Rectangle.Empty, win = content, rMode = Rectangle.Empty, rTools = Rectangle.Empty, rLinks = Rectangle.Empty, rSys = Rectangle.Empty;
             var links = new List<Btn>(); var sysBtns = new List<Btn>();
             if (st.Hover)
@@ -710,7 +722,7 @@ namespace ClassroomHud
                     int st0 = cx - (lw2 + gp + rw2) / 2;
                     return new[] { st0, st0 + lw2 + gp };
                 };
-                int bottomTop = content.Bottom + off, bottomH = Math.Max(MH, TH2);
+                int bottomTop = (musBelow ? mus.Bottom : content.Bottom) + off, bottomH = Math.Max(MH, TH2);
                 var px = pair(MW, TW2);
                 if (MW > 0) rMode = new Rectangle(px[0], bottomTop, MW, MH);
                 if (TW2 > 0) rTools = new Rectangle(px[1], bottomTop, TW2, TH2);
@@ -722,7 +734,7 @@ namespace ClassroomHud
                     tb = new Rectangle(cx - TW / 2, nextTop, TW, TH);
                     nextTop = tb.Bottom + off;
                 }
-                int topTop = content.Top - off - Math.Max(SH, LH);
+                int topTop = (musAbove ? mus.Top : content.Top) - off - Math.Max(SH, LH);
                 if (topTop < work.Top) topTop = nextTop;   // 위에 자리가 없으면 맨 아래로
                 var tx2 = pair(LW, SW);
                 if (LW > 0) rLinks = new Rectangle(tx2[0], topTop, LW, LH);
@@ -730,7 +742,7 @@ namespace ClassroomHud
                 foreach (var r0 in new[] { rMode, rTools, tb, rLinks, rSys }) if (!r0.IsEmpty) win = Rectangle.Union(win, r0);
             }
 
-            var comp = new Composition { Win = win, Content = content };
+            var comp = new Composition { Win = win, Content = content, Music = mus };
             var bmp = new Bitmap(Math.Max(1, Math.Min(8000, win.Width)), Math.Max(1, Math.Min(8000, win.Height)), PixelFormat.Format32bppArgb);
             comp.Bmp = bmp;
             using (var g = Graphics.FromImage(bmp))
@@ -950,7 +962,7 @@ namespace ClassroomHud
                     case "pin":
                         {
                             var st0 = g.Save();
-                            g.TranslateTransform(cx, cy); g.RotateTransform(45);
+                            g.TranslateTransform(cx, cy); g.RotateTransform(b.On ? 0 : 45);   // 고정되면 똑바로 선 압정
                             float hw = u * 0.55f;
                             g.FillRectangle(br, -hw, -u * 1.25f, hw * 2, u * 1.05f);          // 압정 몸통
                             g.FillRectangle(br, -u * 0.95f, -u * 0.3f, u * 1.9f, u * 0.38f);  // 넓은 머리

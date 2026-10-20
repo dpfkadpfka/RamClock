@@ -130,12 +130,13 @@ namespace ClassroomHud
             lastSig = sig;
             var work = Screen.FromPoint(new Point(S.X, S.Y)).WorkingArea;
             dpiK = DpiAt(S.X, S.Y + 5);
+            MusicSize();
             var c = Painter.Compose(SS, st, now, dpiK, S.X, S.Y, work);
             if (comp != null && comp.Bmp != null) comp.Bmp.Dispose();
             comp = c;
             Push(c.Bmp, c.Win.Location);
             if (memoEd != null && !memoEd.IsDisposed) memoEd.Place(c.Content, c.MemoY);
-            FollowMusic(c.Content);
+            FollowMusic(c.Music);
         }
 
         void Push(Bitmap bmp, Point pos)
@@ -787,22 +788,45 @@ namespace ClassroomHud
         [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
         Form MakeMusic(string url)
         {
-            var f = new MusicForm(() => S, () => comp != null ? comp.Content : Rectangle.Empty, dpiK);
+            var f = new MusicForm(() => S, () => { ver++; Render(true); }, dpiK, DragFromMusic);
             if (url != null) f.Play(url);
             f.FormClosed += (o, e) => { music = null; st.MusicOpen = false; ver++; Render(true); };
             f.SetTop(S.TopMostOn);
-            if (comp != null) f.Follow(comp.Content);
+            music = f;
+            st.MusicOpen = true;
             f.Show(this);
+            ver++; Render(true);
             return f;
         }
         [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
         void MusicPlay(string url) { ((MusicForm)music).Play(url); music.Show(); }
         [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
-        void MusicFollow(Rectangle c) { ((MusicForm)music).Follow(c); }
+        void MusicFollow(Rectangle c) { ((MusicForm)music).Follow(c, comp != null && c.Top > comp.Content.Top); }
         [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
         void MusicTopCore() { ((MusicForm)music).SetTop(S.TopMostOn); }
         void MusicTop() { if (music != null && !music.IsDisposed) try { MusicTopCore(); } catch { } }
+        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+        void MusicSizeCore() { var m = (MusicForm)music; st.MusicH = m.LayoutH; st.MusicMinW = m.MinimumSize.Width; }
+        void MusicSize() { st.MusicH = 0; if (music != null && !music.IsDisposed) try { MusicSizeCore(); } catch { } }
         void FollowMusic(Rectangle c) { if (music != null && !music.IsDisposed && music.Visible) try { MusicFollow(c); } catch { } }
+
+        // 플레이어 머리줄을 끌면 시계째로 움직이기
+        void DragFromMusic()
+        {
+            if (S.Locked || comp == null) return;
+            var before = comp.Win.Location;
+            dragging = true;
+            ReleaseCapture();
+            SendMessage(Handle, 0xA1, new IntPtr(2), IntPtr.Zero);
+            dragging = false;
+            RECT r;
+            if (GetWindowRect(Handle, out r))
+            {
+                int dx = r.Left - before.X, dy = r.Top - before.Y;
+                if (dx != 0 || dy != 0) { S.X += dx; S.Y += dy; S.Save(); }
+            }
+            ver++; Render(true);
+        }
 
         // 시계를 끄는 동안에도 플레이어가 같이 따라오게
         protected override void OnMove(EventArgs e)
@@ -810,7 +834,7 @@ namespace ClassroomHud
             base.OnMove(e);
             if (dragging && comp != null && music != null)
             {
-                var c = comp.Content;
+                var c = comp.Music;
                 c.Offset(Left - comp.Win.Left, Top - comp.Win.Top);
                 FollowMusic(c);
             }
