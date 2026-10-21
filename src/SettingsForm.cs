@@ -796,6 +796,19 @@ namespace ClassroomHud
             cbTtDay.SelectedIndex = 0;
             cbTtDay.SelectedIndexChanged += (o, e) => { CommitTt(); ttDay = cbTtDay.SelectedIndex + 1; LoadTt(); };
             top.Controls.Add(cbTtDay);
+            // 요일마다 몇 교시까지 (예: 수요일 4교시)
+            top.Controls.Add(new Label { Text = "이 요일 수업은", AutoSize = true, Margin = new Padding(6, 9, 6, 3) });
+            cbTtCount = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 150, Margin = new Padding(0, 5, 10, 3) };
+            cbTtCount.Items.Add("시정표대로 전부");
+            for (int i = 1; i <= 8; i++) cbTtCount.Items.Add(i + "교시까지");
+            cbTtCount.SelectedIndexChanged += (o, e) =>
+            {
+                if (ttCountLoading) return;
+                CommitTt();
+                if (cbTtCount.SelectedIndex <= 0) R.DayPeriods.Remove(ttDay.ToString()); else R.DayPeriods[ttDay.ToString()] = cbTtCount.SelectedIndex;
+                LoadTt();
+            };
+            top.Controls.Add(cbTtCount);
             gTt = NewGrid();
             gTt.Columns.Add(TextCol("교시", 18, true));
             gTt.Columns.Add(TextCol("과목", 60));
@@ -838,10 +851,14 @@ namespace ClassroomHud
             Page("시간표", new Control[] { sw, host }, new float[] { 0, 100 });
         }
 
+        ComboBox cbTtCount; bool ttCountLoading;
         void LoadTt()
         {
             int n = 0;
             foreach (var sl in Sched.Slots(R, ttDay)) if (sl.Type == "class") n++;
+            int lim; if (!R.DayPeriods.TryGetValue(ttDay.ToString(), out lim)) lim = 0;
+            if (cbTtCount != null) { ttCountLoading = true; cbTtCount.SelectedIndex = Math.Max(0, Math.Min(8, lim)); ttCountLoading = false; }
+            if (lim > 0 && lim < n) n = lim;
             List<Subj> l;
             if (!R.Timetable.TryGetValue(ttDay.ToString(), out l) || l == null) { l = new List<Subj>(); R.Timetable[ttDay.ToString()] = l; }
             gTt.Rows.Clear();

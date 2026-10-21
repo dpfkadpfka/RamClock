@@ -162,6 +162,7 @@ namespace ClassroomHud
         public List<Period> Schedule { get; set; }
         public List<int> OverrideDays { get; set; }
         public Dictionary<string, List<Period>> DaySchedules { get; set; }
+        public Dictionary<string, int> DayPeriods { get; set; }   // 요일마다 몇 교시까지 (0 = 시정표대로)
         public Dictionary<string, List<Subj>> Timetable { get; set; }
         public Dictionary<string, Rule> Rules { get; set; }
         public List<Msg> Messages { get; set; }
@@ -237,6 +238,7 @@ namespace ClassroomHud
             if (Schedule == null || Schedule.Count == 0) Schedule = DefaultSchedule();
             if (OverrideDays == null) OverrideDays = new List<int>();
             if (DaySchedules == null) DaySchedules = new Dictionary<string, List<Period>>();
+            if (DayPeriods == null) DayPeriods = new Dictionary<string, int>();
             if (Timetable == null)
             {
                 Timetable = new Dictionary<string, List<Subj>> {
@@ -313,6 +315,24 @@ namespace ClassroomHud
                 wp.Days.TryGetValue(dow.ToString(), out l) && l != null && n - 1 < l.Count && l[n - 1] != null &&
                 !string.IsNullOrWhiteSpace(l[n - 1].Subj)) return l[n - 1];
             return null;
+        }
+
+        // 그날 수업이 몇 교시까지인지 (0 = 시정표대로 전부)
+        // 이번 주 주간학습안내가 있으면 과목이 적힌 마지막 교시까지, 없으면 시간표 탭에서 정한 요일별 교시 수
+        public int ClassCount(DateTime date)
+        {
+            int dow = (int)date.DayOfWeek;
+            WeekPlan wp; List<WeekCell> l;
+            if (WeekPlans != null && WeekPlans.TryGetValue(WeekKey(date), out wp) && wp != null && wp.Days != null &&
+                wp.Days.TryGetValue(dow.ToString(), out l) && l != null)
+            {
+                int last = 0;
+                for (int i = 0; i < l.Count; i++) if (l[i] != null && !string.IsNullOrWhiteSpace(l[i].Subj)) last = i + 1;
+                if (last > 0) return last;
+            }
+            int n;
+            if (DayPeriods != null && DayPeriods.TryGetValue(dow.ToString(), out n) && n > 0) return n;
+            return 0;
         }
 
         public Subj SubjectOn(DateTime date, int n)
@@ -488,11 +508,23 @@ namespace ClassroomHud
             return list;
         }
 
+        // 그날 실제 수업: 정한 교시 뒤의 쉬는 시간·교시는 뺀다 (예: 수요일 4교시까지)
+        public static List<Slot> Slots(Settings S, DateTime date)
+        {
+            var list = Slots(S, (int)date.DayOfWeek);
+            int max = S.ClassCount(date);
+            if (max <= 0) return list;
+            int cut = -1;
+            for (int i = 0; i < list.Count; i++) if (list[i].Type == "class" && list[i].N == max) { cut = i; break; }
+            if (cut >= 0 && cut < list.Count - 1) list.RemoveRange(cut + 1, list.Count - cut - 1);
+            return list;
+        }
+
         public static string Status(Settings S, DateTime now)
         {
             int dow = (int)now.DayOfWeek;
             if (dow == 0 || dow == 6) return "즐거운 주말이에요!";
-            var sl = Slots(S, dow);
+            var sl = Slots(S, now);
             if (sl.Count == 0) return "";
             int sec = now.Hour * 3600 + now.Minute * 60 + now.Second;
             foreach (var s in sl)
@@ -530,7 +562,7 @@ namespace ClassroomHud
             int dow = (int)date.DayOfWeek;
             var ev = new List<Ev>();
             var R = S.Rules;
-            foreach (var s in Slots(S, dow))
+            foreach (var s in Slots(S, date))
             {
                 if (s.Type != "class") continue;
                 int st = s.StartMin * 60;
