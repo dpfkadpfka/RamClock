@@ -430,23 +430,100 @@ namespace ClassroomHud
             return HudFam(S.MemoFont);
         }
 
-        // 메모 한 덩어리(메모지 바탕 + 글자)를 그림으로
+        // 부분 꾸미기 덩어리 (저장된 게 지금 글과 안 맞으면 전체 꾸미기 하나로)
+        public static List<MemoRun> RunsOf(Settings S)
+        {
+            string memo = (S.Memo ?? "").Replace("\r", "");
+            if (S.MemoRuns != null && S.MemoRuns.Count > 0)
+            {
+                var sb = new System.Text.StringBuilder();
+                foreach (var r in S.MemoRuns) sb.Append(r.T);
+                if (sb.ToString().Replace("\r", "").TrimEnd('\n', ' ') == memo.TrimEnd('\n', ' ')) return S.MemoRuns;
+            }
+            return new List<MemoRun> { new MemoRun { T = memo, B = S.MemoBold } };
+        }
+        public static string MemoKey(Settings S)
+        {
+            var sb = new System.Text.StringBuilder(S.Memo ?? "");
+            if (S.MemoRuns != null) foreach (var r in S.MemoRuns) sb.Append('|').Append(r.T).Append(r.B).Append(r.I).Append(r.U).Append(r.K).Append(r.C).Append(r.Z);
+            return sb.ToString();
+        }
+
+        class Frag { public string T; public MemoRun R; public float Em, W; public bool Space; }
+        static StringFormat measureSf;
+
+        // 메모 한 덩어리(메모지 바탕 + 글자)를 그림으로 — 덩어리마다 굵기·기울임·밑줄·취소선·색·크기
         public static Bitmap MemoBitmap(Settings S, FontFamily textFam, float s, float maxW)
         {
             if (string.IsNullOrWhiteSpace(S.Memo)) return null;
             var mf = MemoFam(S, textFam);
-            float em = Math.Max(10, S.MemoSize) * s, lineH = em * 1.32f;
-            var paths = new List<GraphicsPath>(); var ws = new List<float>();
-            foreach (var raw in S.Memo.Replace("\r", "").Split('\n'))
-                foreach (var ln in Wrap(raw.Trim(), mf, em, maxW))
+            float baseEm = Math.Max(10, S.MemoSize) * s;
+            if (measureSf == null) { measureSf = (StringFormat)StringFormat.GenericTypographic.Clone(); measureSf.FormatFlags |= StringFormatFlags.MeasureTrailingSpaces; }
+            var fonts = new Dictionary<string, Font>();
+            Func<float, bool, Font> F = (em, bold) =>
+            {
+                string key = em.ToString("0.0") + bold;
+                Font f; if (fonts.TryGetValue(key, out f)) return f;
+                try { f = new Font(mf, em, (FontStyle)StyleFor(mf, bold), GraphicsUnit.Pixel); } catch { f = new Font(UiFam, em, bold ? FontStyle.Bold : FontStyle.Regular, GraphicsUnit.Pixel); }
+                fonts[key] = f; return f;
+            };
+            Func<string, MemoRun, float, float> Adv = (t, r, em) => MG.MeasureString(t, F(em, r.B), PointF.Empty, measureSf).Width;
+
+            // 1) 줄 나누기(Enter) → 낱말 단위 조각
+            var logical = new List<List<Frag>>(); var curL = new List<Frag>();
+            foreach (var r in RunsOf(S))
+            {
+                float em = baseEm * (r.Z <= 0 ? 1f : r.Z);
+                var parts = (r.T ?? "").Replace("\r", "").Split('\n');
+                for (int i = 0; i < parts.Length; i++)
                 {
-                    float w, h;
-                    paths.Add(TextPath(ln, mf, em, S.MemoBold, out w, out h)); ws.Add(w);
+                    if (i > 0) { logical.Add(curL); curL = new List<Frag>(); }
+                    foreach (System.Text.RegularExpressions.Match m in System.Text.RegularExpressions.Regex.Matches(parts[i], @"\S+|\s+"))
+                        curL.Add(new Frag { T = m.Value, R = r, Em = em, Space = char.IsWhiteSpace(m.Value[0]), W = Adv(m.Value, r, em) });
                 }
-            if (paths.Count == 0) return null;
-            float maxw = 0; foreach (var w in ws) maxw = Math.Max(maxw, w);
-            float px = S.MemoBgOn ? 16 * s : 0, py = S.MemoBgOn ? 9 * s : 0, edge = 6 * s;
-            float bw = maxw + px * 2, bh = paths.Count * lineH + py * 2;
+            }
+            logical.Add(curL);
+            while (logical.Count > 0 && logical[logical.Count - 1].TrueForAll(f => f.Space)) logical.RemoveAt(logical.Count - 1);
+            while (logical.Count > 0 && logical[0].TrueForAll(f => f.Space)) logical.RemoveAt(0);
+            if (logical.Count == 0) { foreach (var f in fonts.Values) f.Dispose(); return null; }
+
+            // 2) 폭에 맞춰 감싸기 (낱말이 여러 꾸미기로 이어져 있어도 한 덩어리로)
+            var lines = new List<List<Frag>>();
+            foreach (var L in logical)
+            {
+                var line = new List<Frag>(); float x = 0; var pend = new List<Frag>(); float pendW = 0;
+                int i = 0;
+                // 앞뒤 빈칸 떼기
+                int a0 = 0, a1 = L.Count - 1;
+                while (a0 <= a1 && L[a0].Space) a0++;
+                while (a1 >= a0 && L[a1].Space) a1--;
+                i = a0;
+                while (i <= a1)
+                {
+                    if (L[i].Space) { pend.Add(L[i]); pendW += L[i].W; i++; continue; }
+                    var word = new List<Frag>(); float ww = 0;
+                    while (i <= a1 && !L[i].Space) { word.Add(L[i]); ww += L[i].W; i++; }
+                    if (line.Count > 0 && x + pendW + ww > maxW) { lines.Add(line); line = new List<Frag>(); x = 0; }
+                    else if (line.Count > 0) { line.AddRange(pend); x += pendW; }
+                    pend.Clear(); pendW = 0;
+                    line.AddRange(word); x += ww;
+                }
+                lines.Add(line);
+            }
+
+            // 3) 크기 재기
+            float asc = 0.8f;
+            try { int st0 = StyleFor(mf, false); asc = mf.GetCellAscent((FontStyle)st0) / (float)mf.GetEmHeight((FontStyle)st0); } catch { }
+            var lw = new List<float>(); var lh = new List<float>(); var lm = new List<float>();
+            float maxw = 0, total = 0;
+            foreach (var line in lines)
+            {
+                float w = 0, me = 0; foreach (var f in line) { w += f.W; me = Math.Max(me, f.Em); }
+                if (me == 0) me = baseEm * 0.8f;
+                lw.Add(w); lm.Add(me); lh.Add(me * 1.32f); maxw = Math.Max(maxw, w); total += me * 1.32f;
+            }
+            float px = S.MemoBgOn ? 16 * s : 0, py = S.MemoBgOn ? 9 * s : 0, edge = 6 * s + baseEm * 0.15f;
+            float bw = maxw + px * 2, bh = total + py * 2;
             var bmp = new Bitmap((int)Math.Ceiling(bw + edge * 2), (int)Math.Ceiling(bh + edge * 2), PixelFormat.Format32bppArgb);
             using (var g = Graphics.FromImage(bmp))
             {
@@ -459,18 +536,37 @@ namespace ClassroomHud
                         using (var sh = Round(new RectangleF(box.X, box.Y + 2 * s, box.Width, box.Height), 10 * s)) using (var b = new SolidBrush(Color.FromArgb(40, 0, 0, 0))) g.FillPath(b, sh);
                         using (var b = new SolidBrush(Color.FromArgb((int)(Math.Max(10, Math.Min(100, S.MemoBgOpacity)) * 2.55f), ParseColor(S.MemoBgColor)))) g.FillPath(b, rr);
                     }
-                Color mc = ParseColor(S.MemoColor);
+                Color baseC = ParseColor(S.MemoColor);
                 float y = box.Y + py;
-                for (int i = 0; i < paths.Count; i++)
+                for (int li = 0; li < lines.Count; li++)
                 {
-                    using (var m = new Matrix()) { m.Translate(box.X + (box.Width - ws[i]) / 2f, y + (lineH - em) / 2f); paths[i].Transform(m); }
-                    if (S.MemoOutline) Styled(g, paths[i], s, mc, S, false, 0.8f, true, S.MemoOutlineColor, 4);
-                    else if (!S.MemoBgOn && S.Shadow) Styled(g, paths[i], s, mc, S, false, 0.8f, false, "#FFFFFF", 1);
-                    else using (var b = new SolidBrush(mc)) g.FillPath(b, paths[i]);
-                    paths[i].Dispose();
-                    y += lineH;
+                    float baseline = y + (lh[li] - lm[li]) / 2f + lm[li] * asc;
+                    float x = box.X + px + (maxw - lw[li]) / 2f;
+                    foreach (var f in lines[li])
+                    {
+                        if (!f.Space || f.R.U || f.R.K)
+                            using (var p = new GraphicsPath())
+                            {
+                                if (!f.Space) try { p.AddString(f.T, mf, StyleFor(mf, f.R.B), f.Em, new PointF(x, baseline - f.Em * asc), StringFormat.GenericTypographic); } catch { }
+                                if (f.R.I && p.PointCount > 0)
+                                    using (var m = new Matrix()) { m.Translate(0, baseline); m.Shear(-0.21f, 0); m.Translate(0, -baseline); p.Transform(m); }
+                                float th = Math.Max(1f, f.Em * 0.065f);
+                                if (f.R.U) p.AddRectangle(new RectangleF(x, baseline + f.Em * 0.09f, f.W, th));
+                                if (f.R.K) p.AddRectangle(new RectangleF(x, baseline - f.Em * 0.30f, f.W, th));
+                                if (p.PointCount > 0)
+                                {
+                                    Color mc = string.IsNullOrEmpty(f.R.C) ? baseC : ParseColor(f.R.C);
+                                    if (S.MemoOutline) Styled(g, p, s, mc, S, false, 0.8f, true, S.MemoOutlineColor, 4);
+                                    else if (!S.MemoBgOn && S.Shadow) Styled(g, p, s, mc, S, false, 0.8f, false, "#FFFFFF", 1);
+                                    else using (var b = new SolidBrush(mc)) g.FillPath(b, p);
+                                }
+                            }
+                        x += f.W;
+                    }
+                    y += lh[li];
                 }
             }
+            foreach (var f in fonts.Values) f.Dispose();
             return bmp;
         }
 
@@ -671,7 +767,7 @@ namespace ClassroomHud
             }
 
             // 같은 설정이면 폭이 줄어들지 않게 → 매초 창이 좌우로 흔들리지 않음
-            string sk = s.ToString("0.000") + "|" + S.Mode + "|" + S.ShowSeconds + "|" + S.DigitFont + "|" + S.ClockFontName + S.ClockFontFile + S.ClockBold + "|" + S.FontName + S.FontFile + S.Bold + "|" + S.BgStyle + "|" + (S.Memo ?? "").GetHashCode() + "|" + banner + "|" + now.Date.Ticks;
+            string sk = s.ToString("0.000") + "|" + S.Mode + "|" + S.ShowSeconds + "|" + S.DigitFont + "|" + S.ClockFontName + S.ClockFontFile + S.ClockBold + "|" + S.FontName + S.FontFile + S.Bold + "|" + S.BgStyle + "|" + (st.MemoEdit ? 0 : MemoKey(S).GetHashCode()) + "|" + banner + "|" + now.Date.Ticks;
             if (st.StickKey != sk) { st.StickKey = sk; st.StickW = 0; }
             cw = Math.Max(cw, st.StickW); st.StickW = cw;
             int CW = (int)Math.Ceiling(cw), CH = (int)Math.Ceiling(ch);

@@ -393,7 +393,7 @@ namespace ClassroomHud
             else if (id.StartsWith("c:")) { S.Color = id.Substring(2); st.Popup = 0; S.Save(); }
             else if (id == "memodel")
             {
-                S.Memo = ""; S.Save(); ver++; Render(true);
+                S.Memo = ""; S.MemoRuns = null; S.Save(); ver++; Render(true);
                 return;
             }
             else if (id == "linkadd") { AddLinkFromWidget(); return; }
@@ -517,7 +517,7 @@ namespace ClassroomHud
             memoEd.StyleRequested = () => BeginInvoke(new Action(OpenMemoStyle));
             memoEd.FormClosed += (o, e) =>
             {
-                S.Memo = memoEd.MemoText; S.Save();
+                S.Memo = memoEd.MemoText; if (string.IsNullOrWhiteSpace(S.Memo)) S.MemoRuns = null; S.Save();
                 memoEd = null; st.MemoEdit = false; ver++; Render(true);
             };
             memoEd.Place(comp.Content, comp.MemoY);
@@ -625,7 +625,7 @@ namespace ClassroomHud
             t.Mode = S.Mode;
             t.Playlists = S.Playlists; t.MusicLast = S.MusicLast; t.MusicW = S.MusicW; t.MusicH = S.MusicH; t.MusicDX = S.MusicDX; t.MusicDY = S.MusicDY; t.MusicToolAdded = S.MusicToolAdded;
             if (t == previewS && previewFromMemo) return;
-            t.Memo = S.Memo; t.MemoColor = S.MemoColor; t.MemoBgOn = S.MemoBgOn; t.MemoBgColor = S.MemoBgColor; t.MemoBgOpacity = S.MemoBgOpacity;
+            t.Memo = S.Memo; t.MemoRuns = S.MemoRuns; t.MemoColor = S.MemoColor; t.MemoBgOn = S.MemoBgOn; t.MemoBgColor = S.MemoBgColor; t.MemoBgOpacity = S.MemoBgOpacity;
             t.MemoFont = S.MemoFont; t.MemoSize = S.MemoSize; t.MemoBold = S.MemoBold; t.MemoOutline = S.MemoOutline; t.MemoOutlineColor = S.MemoOutlineColor;
             t.Picked = S.Picked; t.PickEffect = S.PickEffect; t.PickSound = S.PickSound;
         }
@@ -877,7 +877,7 @@ namespace ClassroomHud
             if (st.Maximized) { S.X = st.MaxPrevX; S.Y = st.MaxPrevY; S.Scale = st.MaxPrevScale; st.Maximized = false; }
             // 작업 표시줄의 [창 닫기]·Alt+F4도 진짜 종료 (숨기기는 위젯의 [숨기기] 버튼)
             exiting = true;
-            if (memoEd != null && !memoEd.IsDisposed) { try { S.Memo = memoEd.MemoText; } catch { } }
+            if (memoEd != null && !memoEd.IsDisposed) { try { S.Memo = memoEd.MemoText; S.MemoRuns = memoEd.Runs; } catch { } }
             S.Save();
             if (tray != null) { tray.Visible = false; tray.Dispose(); }
             base.OnFormClosing(e);

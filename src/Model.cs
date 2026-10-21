@@ -34,6 +34,20 @@ namespace ClassroomHud
         public Rule(bool on, int times, string text) { On = on; Times = times; Text = text; }
     }
 
+    // 메모 글자 한 덩어리(부분 꾸미기): 굵게·기울임·밑줄·취소선·색·크기(기본 크기의 배수)
+    public class MemoRun
+    {
+        public string T { get; set; }
+        public bool B { get; set; }
+        public bool I { get; set; }
+        public bool U { get; set; }
+        public bool K { get; set; }
+        public string C { get; set; }
+        public float Z { get; set; }
+        public MemoRun() { }
+        public bool SameStyle(MemoRun o) { return o != null && B == o.B && I == o.I && U == o.U && K == o.K && C == o.C && Math.Abs((Z <= 0 ? 1 : Z) - (o.Z <= 0 ? 1 : o.Z)) < 0.01f; }
+    }
+
     public class QuickLink
     {
         public string Name { get; set; }
@@ -126,6 +140,7 @@ namespace ClassroomHud
         public string MemoFont { get; set; } = "";
         public int MemoSize { get; set; } = 19;
         public bool MemoBold { get; set; } = true;
+        public List<MemoRun> MemoRuns { get; set; }   // 부분 꾸미기 (없거나 글이 안 맞으면 전체 꾸미기만)
         public bool MemoOutline { get; set; }
         public string MemoOutlineColor { get; set; } = "#FFFFFF";
         public string ClockFontName { get; set; } = "";     // 비우면 글자 글꼴과 같게
