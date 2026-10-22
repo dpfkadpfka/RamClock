@@ -928,20 +928,36 @@ namespace ClassroomHud
                 top.Controls.Add(new Label { Text = "컴퓨터에 한국어 음성이 없어요. 녹음이나 소리 파일을 쓰거나, 윈도우 설정 > 시간 및 언어 > 음성에서 추가해 주세요.", AutoSize = true, ForeColor = Color.Firebrick, Margin = new Padding(3, 7, 3, 3), MaximumSize = new Size(860, 0) });
 
             gRules = NewGrid();
-            gRules.Columns.Add(CheckCol("사용", 8));
-            gRules.Columns.Add(TextCol("언제", 18, true));
-            gRules.Columns.Add(ComboCol("반복", 9, "1회", "2회", "3회"));
-            gRules.Columns.Add(TextCol("안내 문구 (글자 읽기일 때 읽어요)", 46));
-            gRules.Columns.Add(TextCol("소리", 18, true));
-            gRules.Columns.Add(BtnCol("소리 바꾸기", 12));
-            gRules.Columns.Add(BtnCol("▶ 듣기", 9)); gRules.Columns[gRules.Columns.Count - 1].Name = "test";
-            gRules.Columns[gRules.Columns.Count - 2].Name = "sound";
-            for (int i = 0; i < Settings.RuleKeys.Length; i++)
+            gRules.Columns.Add(CheckCol("사용", 6));
+            gRules.Columns.Add(ComboCol("기준", 15, AnchorNames));
+            gRules.Columns.Add(TextCol("몇 분 / 시각", 10));
+            gRules.Columns.Add(ComboCol("전·후", 8, "전", "후"));
+            gRules.Columns.Add(ComboCol("어떤 수업", 13, TargetNames()));
+            gRules.Columns.Add(ComboCol("반복", 7, "1회", "2회", "3회"));
+            gRules.Columns.Add(TextCol("안내 문구 (글자 읽기일 때 읽어요)", 34));
+            gRules.Columns.Add(TextCol("소리", 12, true));
+            gRules.Columns.Add(BtnCol("소리…", 8)); gRules.Columns[gRules.Columns.Count - 1].Name = "sound";
+            gRules.Columns.Add(BtnCol("▶", 5)); gRules.Columns[gRules.Columns.Count - 1].Name = "test";
+            AddDeleteCol(gRules, null);
+            foreach (var r in R.AutoRules) AddRuleRow(r);
+            // 시각·분 칸: 0950 → 09:50, "5분" → 5
+            gRules.CellEndEdit += (o, e) =>
             {
-                var r = R.Rules[Settings.RuleKeys[i]];
-                int idx = gRules.Rows.Add(r.On, Settings.RuleNames[i], Math.Max(1, Math.Min(3, r.Times)) + "회", r.Text, SoundText(r.Sound));
-                gRules.Rows[idx].Tag = r.Sound ?? "";
-            }
+                if (e.RowIndex < 0 || e.ColumnIndex != 2) return;
+                var row = gRules.Rows[e.RowIndex]; var c = row.Cells[2];
+                string v = (c.Value as string ?? "").Trim();
+                if (Convert.ToString(row.Cells[1].Value) == "정한 시각") { int mm = Sched.ToMin(v); if (mm >= 0) c.Value = Sched.FromMin(mm); }
+                else { int n; if (int.TryParse(v.Replace("분", "").Trim(), out n)) c.Value = Math.Max(0, Math.Min(120, n)) + "분"; }
+            };
+            gRules.CellValueChanged += (o, e) =>
+            {
+                if (e.RowIndex < 0 || e.ColumnIndex != 1) return;
+                var row = gRules.Rows[e.RowIndex];
+                bool tm = Convert.ToString(row.Cells[1].Value) == "정한 시각";
+                if (tm && Sched.ToMin(row.Cells[2].Value as string) < 0) row.Cells[2].Value = "08:50";
+                if (!tm && Sched.ToMin(row.Cells[2].Value as string) >= 0 && (row.Cells[2].Value as string ?? "").Contains(":")) row.Cells[2].Value = "1분";
+            };
+            gRules.CurrentCellDirtyStateChanged += (o, e) => { if (gRules.IsCurrentCellDirty && gRules.CurrentCell is DataGridViewComboBoxCell) gRules.CommitEdit(DataGridViewDataErrorContexts.Commit); };
             gRules.CellContentClick += (o, e) =>
             {
                 if (e.RowIndex < 0) return;
@@ -950,14 +966,39 @@ namespace ClassroomHud
                 if (!(gRules.Columns[e.ColumnIndex] is DataGridViewButtonColumn)) return;   // 글자 칸을 누를 때는 아무 소리 없이 고치기만
                 if (gRules.Columns[e.ColumnIndex].Name == "sound")
                 {
-                    using (var d = new SoundDialog(row.Cells[1].Value as string, row.Tag as string, Sched.Fill(row.Cells[3].Value as string, 1, "국어")))
-                        if (d.ShowDialog(this) == DialogResult.OK) { row.Tag = d.Result; row.Cells[4].Value = SoundText(d.Result); }
+                    using (var d = new SoundDialog("자동 안내", row.Tag as string, Sched.Fill(row.Cells[6].Value as string, 1, "국어")))
+                        if (d.ShowDialog(this) == DialogResult.OK) { row.Tag = d.Result; row.Cells[7].Value = SoundText(d.Result); }
                 }
                 else if (gRules.Columns[e.ColumnIndex].Name == "test")
-                    Audio.Announce(Sched.Fill(row.Cells[3].Value as string, 1, "국어"), row.Tag as string, Times(row.Cells[2].Value), true, true);
+                    Audio.Announce(Sched.Fill(row.Cells[6].Value as string, 1, "국어"), row.Tag as string, Times(row.Cells[5].Value), true, true);
             };
-            var note = Note("{n}은 교시 번호, {subj}는 과목 이름으로 바뀌어요. [소리 바꾸기]에서 소리 파일(mp3·wav)을 넣거나 마이크로 직접 녹음하면 글자 읽기 대신 그 소리가 나와요.");
-            Page("자동 음성 안내", new Control[] { top, gRules, note }, new float[] { 0, 100, 0 });
+            var rbar = Flow();
+            var bRAdd = B("+ 알림 추가"); bRAdd.Tag = "primary";
+            var bRReset = B("처음 알림으로 되돌리기");
+            bRAdd.Click += (o, e) =>
+            {
+                int i = AddRuleRow(new AutoRule("start", 2, "before", "all", 1, "{n}교시 {subj} 수업 2분 전입니다."));
+                gRules.CurrentCell = gRules.Rows[i].Cells[2]; gRules.BeginEdit(true);
+            };
+            bRReset.Click += (o, e) => { if (AskReset("처음 들어 있던 자동 안내 4가지로 되돌려요.")) { gRules.Rows.Clear(); foreach (var r in Settings.RulesFromOld(Settings.DefaultRules())) AddRuleRow(r); } };
+            rbar.Controls.AddRange(new Control[] { bRAdd, bRReset });
+            var note = Note("줄마다 [기준]과 [몇 분 / 시각], [전·후]를 정해요. 예) 수업 끝 · 5분 · 전 → 수업 끝나기 5분 전에 안내. 0분이면 그 시각 정각, [정한 시각]은 매일 그 시각(예: 08:50 아침 독서)에 울려요.\n{n}은 교시 번호, {subj}는 과목 이름으로 바뀌어요. [소리…]에서 소리 파일을 넣거나 직접 녹음하면 글자 읽기 대신 그 소리가 나와요.");
+            Page("자동 음성 안내", new Control[] { top, gRules, rbar, note }, new float[] { 0, 100, 0, 0 });
+        }
+
+        static readonly string[] AnchorKeys = { "start", "end", "lunch", "lunchEnd", "time" };
+        static readonly string[] AnchorNames = { "수업 시작", "수업 끝", "점심 시작", "점심 끝", "정한 시각" };
+        static string[] TargetNames() { var l = new List<string> { "모든 수업", "이동 수업만" }; for (int i = 1; i <= 8; i++) l.Add(i + "교시만"); return l.ToArray(); }
+        static string TargetName(string k) { int n; if (k == "move") return "이동 수업만"; if (int.TryParse(k, out n)) return n + "교시만"; return "모든 수업"; }
+        static string TargetKey(string name) { if (name == "이동 수업만") return "move"; if (name != null && name.EndsWith("교시만")) return name.Replace("교시만", ""); return "all"; }
+
+        int AddRuleRow(AutoRule r)
+        {
+            int ai = Array.IndexOf(AnchorKeys, r.Anchor ?? "start"); if (ai < 0) ai = 0;
+            string v = r.Anchor == "time" ? (r.Clock ?? "08:50") : Math.Max(0, r.Min) + "분";
+            int i = gRules.Rows.Add(r.On, AnchorNames[ai], v, r.When == "after" ? "후" : "전", TargetName(r.Target), Math.Max(1, Math.Min(3, r.Times)) + "회", r.Text, SoundText(r.Sound));
+            gRules.Rows[i].Tag = r.Sound ?? "";
+            return i;
         }
 
         static int Times(object v) { var s = v as string ?? "1"; int n; return int.TryParse(s.Replace("회", ""), out n) ? n : 1; }
@@ -1018,10 +1059,24 @@ namespace ClassroomHud
             gRules.EndEdit(); gMsgs.EndEdit();
             R.Voice = chkVoice.Checked; R.Sfx = chkSfx.Checked;
             if (cbVoice != null) { R.VoiceName = cbVoice.SelectedIndex <= 0 ? "" : cbVoice.SelectedItem as string; R.VoiceRate = slRate.Value; }
-            for (int i = 0; i < Settings.RuleKeys.Length && i < gRules.Rows.Count; i++)
+            R.AutoRules = new List<AutoRule>();
+            foreach (DataGridViewRow row in gRules.Rows)
             {
-                var row = gRules.Rows[i];
-                R.Rules[Settings.RuleKeys[i]] = new Rule(row.Cells[0].Value is bool && (bool)row.Cells[0].Value, Times(row.Cells[2].Value), (row.Cells[3].Value as string ?? "").Trim()) { Sound = row.Tag as string };
+                string anchorName = Convert.ToString(row.Cells[1].Value), v = (row.Cells[2].Value as string ?? "").Trim();
+                int ai = Array.IndexOf(AnchorNames, anchorName); if (ai < 0) ai = 0;
+                var r = new AutoRule
+                {
+                    On = row.Cells[0].Value is bool && (bool)row.Cells[0].Value,
+                    Anchor = AnchorKeys[ai],
+                    When = Convert.ToString(row.Cells[3].Value) == "후" ? "after" : "before",
+                    Target = TargetKey(Convert.ToString(row.Cells[4].Value)),
+                    Times = Times(row.Cells[5].Value),
+                    Text = (row.Cells[6].Value as string ?? "").Trim(),
+                    Sound = row.Tag as string
+                };
+                if (r.Anchor == "time") { int mm = Sched.ToMin(v); r.Clock = mm >= 0 ? Sched.FromMin(mm) : "08:50"; }
+                else { int n; int.TryParse(v.Replace("분", "").Trim(), out n); r.Min = Math.Max(0, n); }
+                R.AutoRules.Add(r);
             }
             R.Messages = new List<Msg>();
             foreach (DataGridViewRow row in gMsgs.Rows)

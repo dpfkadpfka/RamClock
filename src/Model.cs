@@ -34,6 +34,22 @@ namespace ClassroomHud
         public Rule(bool on, int times, string text) { On = on; Times = times; Text = text; }
     }
 
+    // 자동 음성 안내 한 줄: 무엇을 기준으로 몇 분 전/후에 울릴지 선생님이 정함
+    public class AutoRule
+    {
+        public bool On { get; set; } = true;
+        public string Anchor { get; set; } = "start";   // start 수업 시작 · end 수업 끝 · lunch 점심 시작 · lunchEnd 점심 끝 · time 정한 시각
+        public int Min { get; set; }                     // 몇 분
+        public string When { get; set; } = "before";     // before 전 · after 후 (Min이 0이면 정각)
+        public string Clock { get; set; }                // Anchor가 time일 때 "08:50"
+        public string Target { get; set; } = "all";      // all 모든 수업 · move 이동 수업만 · 숫자 그 교시만
+        public int Times { get; set; } = 1;
+        public string Text { get; set; }
+        public string Sound { get; set; }
+        public AutoRule() { }
+        public AutoRule(string anchor, int min, string when, string target, int times, string text) { Anchor = anchor; Min = min; When = when; Target = target; Times = times; Text = text; }
+    }
+
     // 메모 글자 한 덩어리(부분 꾸미기): 굵게·기울임·밑줄·취소선·색·크기(기본 크기의 배수)
     public class MemoRun
     {
@@ -182,6 +198,20 @@ namespace ClassroomHud
             return new List<QuickLink> { new QuickLink("아이스크림", "https://www.i-scream.co.kr"), new QuickLink("유튜브", "https://www.youtube.com") };
         }
 
+        public List<AutoRule> AutoRules { get; set; }   // 선생님이 정하는 자동 안내 (없으면 예전 Rules에서 옮겨 옴)
+
+        public static List<AutoRule> RulesFromOld(Dictionary<string, Rule> R)
+        {
+            var d = DefaultRules();
+            Func<string, Rule> g = k => R != null && R.ContainsKey(k) && R[k] != null ? R[k] : d[k];
+            var l = new List<AutoRule>();
+            var r = g("preStart"); l.Add(new AutoRule("start", 1, "before", "all", r.Times, r.Text) { On = r.On, Sound = r.Sound });
+            r = g("start"); l.Add(new AutoRule("start", 0, "before", "all", r.Times, r.Text) { On = r.On, Sound = r.Sound });
+            r = g("move5"); l.Add(new AutoRule("start", 5, "before", "move", r.Times, r.Text) { On = r.On, Sound = r.Sound });
+            r = g("move3"); l.Add(new AutoRule("start", 3, "before", "move", r.Times, r.Text) { On = r.On, Sound = r.Sound });
+            return l;
+        }
+
         public static readonly string[] RuleKeys = { "preStart", "start", "move5", "move3" };
         public static readonly string[] RuleNames = { "수업 시작 1분 전", "수업 시작", "이동 수업 5분 전", "이동 수업 3분 전" };
 
@@ -253,6 +283,7 @@ namespace ClassroomHud
             var dr = DefaultRules();
             if (Rules == null) Rules = dr;
             foreach (var k in RuleKeys) if (!Rules.ContainsKey(k) || Rules[k] == null) Rules[k] = dr[k];
+            if (AutoRules == null) AutoRules = RulesFromOld(Rules);
             if (Messages == null) Messages = DefaultMessages();
             if (Links == null) Links = DefaultLinks();
             if (Tools == null) Tools = new List<string> { "pick", "memo" };   // 처음에는 뽑기·텍스트만
@@ -559,22 +590,35 @@ namespace ClassroomHud
 
         public static List<Ev> DayEvents(Settings S, DateTime date)
         {
-            int dow = (int)date.DayOfWeek;
             var ev = new List<Ev>();
-            var R = S.Rules;
-            foreach (var s in Slots(S, date))
+            var slots = Slots(S, date);
+            var rules = S.AutoRules ?? Settings.RulesFromOld(S.Rules);
+            for (int ri = 0; ri < rules.Count; ri++)
             {
-                if (s.Type != "class") continue;
-                int st = s.StartMin * 60;
-                var t = S.SubjectOn(date, s.N);
-                string subj = (t.Name ?? "").Trim();
-                Rule r;
-                r = R["preStart"]; if (r.On) ev.Add(new Ev { Id = "p" + s.N, T = st - 60, Text = Fill(r.Text, s.N, subj), Times = r.Times, Sound = r.Sound });
-                r = R["start"]; if (r.On) ev.Add(new Ev { Id = "s" + s.N, T = st, Text = Fill(r.Text, s.N, subj), Times = r.Times, Sound = r.Sound });
-                if (t.Move)
+                var r = rules[ri];
+                if (r == null || !r.On) continue;
+                int off = Math.Max(0, r.Min) * 60 * (r.When == "after" ? 1 : -1);
+                if (r.Anchor == "time")
                 {
-                    r = R["move5"]; if (r.On) ev.Add(new Ev { Id = "a" + s.N, T = st - 300, Text = Fill(r.Text, s.N, subj), Times = r.Times, Sound = r.Sound });
-                    r = R["move3"]; if (r.On) ev.Add(new Ev { Id = "b" + s.N, T = st - 180, Text = Fill(r.Text, s.N, subj), Times = r.Times, Sound = r.Sound });
+                    int m = ToMin(r.Clock);
+                    if (m >= 0) ev.Add(new Ev { Id = "r" + ri + "t", T = m * 60, Text = Fill(r.Text, 0, ""), Times = r.Times, Sound = r.Sound });
+                    continue;
+                }
+                foreach (var s in slots)
+                {
+                    if (r.Anchor == "lunch" || r.Anchor == "lunchEnd")
+                    {
+                        if (s.Type != "lunch") continue;
+                        int t0 = (r.Anchor == "lunch" ? s.StartMin : s.EndMin) * 60;
+                        ev.Add(new Ev { Id = "r" + ri + "l" + s.StartMin, T = t0 + off, Text = Fill(r.Text, 0, ""), Times = r.Times, Sound = r.Sound });
+                        continue;
+                    }
+                    if (s.Type != "class") continue;
+                    var t = S.SubjectOn(date, s.N);
+                    if (r.Target == "move" && !t.Move) continue;
+                    int only; if (int.TryParse(r.Target, out only) && only != s.N) continue;
+                    int at = (r.Anchor == "end" ? s.EndMin : s.StartMin) * 60;
+                    ev.Add(new Ev { Id = "r" + ri + "_" + s.N, T = at + off, Text = Fill(r.Text, s.N, (t.Name ?? "").Trim()), Times = r.Times, Sound = r.Sound });
                 }
             }
             return ev;
