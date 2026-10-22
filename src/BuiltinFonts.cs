@@ -22,6 +22,13 @@ namespace ClassroomHud
             new Def("★ 해바라기", "Sunflower-Medium.ttf", "Sunflower-Bold.ttf"),
             new Def("★ 개구 손글씨", "Gaegu-Bold.ttf"),
             new Def("★ 나눔손글씨 펜", "NanumPenScript-Regular.ttf"),
+            new Def("★ 페이퍼로지", "Paperlogy-7Bold.ttf"),
+            new Def("★ 페이퍼로지 블랙", "Paperlogy-9Black.ttf"),
+            new Def("★ 카페24 써라운드", "Cafe24Ssurround.ttf"),
+            new Def("★ 여기어때 잘난체", "Jalnan.ttf"),
+            new Def("★ 학교안심 둥근미소", "HakgyoansimDunggeunmiso-B.ttf"),
+            new Def("★ 학교안심 알림장", "HakgyoansimAllimjang-B.ttf"),
+            new Def("★ 학교안심 별자리", "HakgyoansimByeoljari-B.ttf"),
         };
 
         public static IEnumerable<string> Names { get { foreach (var d in Defs) yield return d.Name; } }
