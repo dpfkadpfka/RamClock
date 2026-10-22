@@ -38,8 +38,9 @@ namespace ClassroomHud
             inited = true;
             try { sp1 = new SoundPlayer(new MemoryStream(MakeWav(1))); sp1.Load(); } catch { sp1 = null; }
             try { sp3 = new SoundPlayer(new MemoryStream(MakeWav(3))); sp3.Load(); } catch { sp3 = null; }
-            try { spDrum = new SoundPlayer(new MemoryStream(Wav(DrumRoll(), 22050))); spDrum.Load(); } catch { spDrum = null; }
-            try { spFan = new SoundPlayer(new MemoryStream(Wav(Fanfare(), 22050))); spFan.Load(); } catch { spFan = null; }
+            // 뽑기 소리: 8비트 게임 (뿅뿅 올라가다 띠링) — exe 안에 넣어 둔 소리, 없으면 예전 드럼
+            try { spDrum = Res("pick_roll.wav") ?? new SoundPlayer(new MemoryStream(Wav(DrumRoll(), 22050))); spDrum.Load(); } catch { spDrum = null; }
+            try { spFan = Res("pick_hit.wav") ?? new SoundPlayer(new MemoryStream(Wav(Fanfare(), 22050))); spFan.Load(); } catch { spFan = null; }
             try
             {
                 vt = Type.GetTypeFromProgID("SAPI.SpVoice");
@@ -279,6 +280,14 @@ namespace ClassroomHud
         }
 
         public static void RecCancel() { Mci("close hudrec"); }
+
+        static SoundPlayer Res(string name)
+        {
+            var st = System.Reflection.Assembly.GetExecutingAssembly().GetManifestResourceStream(name);
+            if (st == null) return null;
+            var ms = new MemoryStream(); st.CopyTo(ms); st.Dispose(); ms.Position = 0;
+            return new SoundPlayer(ms);
+        }
 
         public static void PlayDrum() { try { if (spDrum != null) spDrum.Play(); } catch { } }
         public static void PlayFanfare() { try { if (spFan != null) spFan.Play(); } catch { } }
