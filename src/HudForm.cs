@@ -582,6 +582,7 @@ namespace ClassroomHud
         {
             if (settingsForm != null && !settingsForm.IsDisposed) { if (tab != null) settingsForm.SelectTab(tab); Ui.BringUp(settingsForm); return; }
             Lower();
+            SettingsForm.DpiK = dpiK;
             var f = new SettingsForm(S.Clone());
             f.StartPosition = FormStartPosition.Manual;
             f.Location = PlaceAway(f.Size);

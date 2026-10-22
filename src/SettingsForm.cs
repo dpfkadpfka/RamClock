@@ -40,6 +40,7 @@ namespace ClassroomHud
         static readonly string[] DayKo = { "", "월", "화", "수", "목", "금" };
 
         public Action<Settings> LivePreview;
+        public static float DpiK = 1f;   // 시계가 있는 화면의 배율 (미리보기를 실제와 같은 크기로)
         public Action<Settings> Saved;
         Label lSaved; Timer savedTimer;
         public int TabCount { get { return pages.Count; } }
@@ -404,8 +405,8 @@ namespace ClassroomHud
             var rh = new FlowLayoutPanel { AutoSize = true, Dock = DockStyle.Fill, WrapContents = false, BackColor = Color.Transparent };
             rh.Controls.Add(new Label { Text = "미리보기", AutoSize = true, Font = Media.UiFont(11F, true), Margin = new Padding(0, 8, 12, 3) });
             cbBack = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 140, Margin = new Padding(0, 5, 0, 3) };
-            cbBack.Items.AddRange(new object[] { "밝은 수업 화면", "어두운 화면", "칠판", "사진 배경" });
-            cbBack.SelectedIndex = 0;
+            cbBack.Items.AddRange(new object[] { "밝은 수업 화면", "어두운 화면", "칠판", "사진 배경", "내 바탕화면" });
+            cbBack.SelectedIndex = Wallpaper() != null ? 4 : 0;
             cbBack.SelectedIndexChanged += (o, e) => RenderPreview();
             rh.Controls.Add(cbBack);
             rt.Controls.Add(rh);
@@ -539,8 +540,36 @@ namespace ClassroomHud
             lClockFile.Text = cf != null ? "불러온 글꼴: " + cf.Name : (R.DigitFont ? "" : "글꼴 숫자를 고르면 원하는 글꼴로 시계를 보여 줘요.");
         }
 
+        static Image wallImg; static string wallPath;
+        static Image Wallpaper()
+        {
+            try
+            {
+                string p = Microsoft.Win32.Registry.GetValue(@"HKEY_CURRENT_USER\Control Panel\Desktop", "WallPaper", "") as string;
+                if (string.IsNullOrEmpty(p) || !System.IO.File.Exists(p)) return null;
+                if (p == wallPath && wallImg != null) return wallImg;
+                using (var fs = new System.IO.FileStream(p, System.IO.FileMode.Open, System.IO.FileAccess.Read)) using (var im = Image.FromStream(fs)) { if (wallImg != null) wallImg.Dispose(); wallImg = new Bitmap(im); }
+                wallPath = p; return wallImg;
+            }
+            catch { return null; }
+        }
+
         static void Backdrop(Graphics g, Rectangle r, int kind)
         {
+            if (kind == 4)
+            {
+                var im = Wallpaper();
+                if (im != null)
+                {
+                    // 화면 전체 배경을 미리보기 칸만큼 가운데 잘라 보여 줌 (실제 크기 그대로)
+                    var scr = Screen.PrimaryScreen.Bounds;
+                    float sc = Math.Max(scr.Width / (float)im.Width, scr.Height / (float)im.Height);
+                    float w = im.Width * sc, h = im.Height * sc;
+                    g.DrawImage(im, r.X + (r.Width - w) / 2, r.Y + (r.Height - h) / 2, w, h);
+                    return;
+                }
+                kind = 3;
+            }
             if (kind == 1) { using (var b = new System.Drawing.Drawing2D.LinearGradientBrush(r, Color.FromArgb(20, 27, 45), Color.FromArgb(44, 56, 86), 60f)) g.FillRectangle(b, r); return; }
             if (kind == 2)
             {
@@ -578,18 +607,19 @@ namespace ClassroomHud
                 {
                     g.SetClip(clip);
                     Backdrop(g, area, cbBack.SelectedIndex);
-                    float keep = R.Scale; R.Scale = 1f;
+                    // 실제 시계와 똑같이: 지금 시각·실제 크기·화면 배율로 그리고, 칸보다 클 때만 줄임
                     string keepMemo = R.Memo;
                     if (string.IsNullOrWhiteSpace(R.Memo)) R.Memo = "시계 아래 텍스트 미리보기";
                     Composition c = null;
-                    try { c = Painter.Compose(R, new HudState(), new DateTime(2026, 10, 8, 9, 45, 52), 1f, 0, 0, new Rectangle(-5000, -5000, 10000, 10000)); }
+                    try { c = Painter.Compose(R, new HudState(), DateTime.Now, DpiK, 0, 0, new Rectangle(-5000, -5000, 10000, 10000)); }
                     catch { }
-                    R.Scale = keep; R.Memo = keepMemo;
+                    R.Memo = keepMemo;
                     if (c != null)
                     {
-                        float sc = Math.Min(1.4f, Math.Min(bmp.Width * 0.9f / c.Bmp.Width, bmp.Height * 0.8f / c.Bmp.Height));
+                        float sc = Math.Min(1f, Math.Min(bmp.Width * 0.94f / c.Bmp.Width, bmp.Height * 0.9f / c.Bmp.Height));
                         float w = c.Bmp.Width * sc, h = c.Bmp.Height * sc;
-                        g.DrawImage(c.Bmp, (bmp.Width - w) / 2, (bmp.Height - h) / 2, w, h);
+                        if (sc >= 0.999f) g.DrawImageUnscaled(c.Bmp, (int)((bmp.Width - w) / 2), (int)((bmp.Height - h) / 2));
+                        else g.DrawImage(c.Bmp, (bmp.Width - w) / 2, (bmp.Height - h) / 2, w, h);
                         c.Bmp.Dispose();
                     }
                     g.ResetClip();
