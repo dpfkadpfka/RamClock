@@ -52,7 +52,7 @@ namespace ClassroomHud
         int hi = -1, result = -1, lastPick = -1;
         DateTime t0, nextSwitch, lastFrame;
         List<int> pool;
-        RectangleF closeBtn;
+        RectangleF closeBtn, maxBtn, minBtn;
 
         public PickerForm(Settings s, Action saveCb, float dpiK, Rectangle screen)
         {
@@ -78,6 +78,8 @@ namespace ClassroomHud
                 else if (e.KeyCode == Keys.Space || e.KeyCode == Keys.Enter) Act("draw");
             };
             Resize += (o, e) => { Layout2(); Invalidate(); };
+            MinimumSize = new Size((int)(640 * k), (int)(420 * k));
+            MaximizedBounds = screen;
         }
 
         public void ShowWithBackdrop() { Show(); Activate(); }
@@ -254,14 +256,17 @@ namespace ClassroomHud
                 string info = gEdit ? "카드를 누를 때마다  남 → 여 → 빈칸  으로 바뀌어요" : (gFilter == 1 ? "남학생 · " : gFilter == 2 ? "여학생 · " : "") + (S.PickNoRepeat ? "남은 학생 " + left + "명 · " : "") + "전체 " + S.StudentCount + "명" + (absent.Count > 0 ? " · 제외 " + absent.Count + "명" : "") + "   (카드를 누르면 오늘 제외)";
                 using (var f = new Font(fam, 14 * k, FontStyle.Regular, GraphicsUnit.Pixel))
                 using (var b = new SolidBrush(Ui.Muted)) g.DrawString(info, f, b, 190 * k, (TopH - 18 * k) / 2);
-                closeBtn = new RectangleF(ClientSize.Width - TopH, 0, TopH, TopH);
+                float bw = TopH * 0.82f;
+                closeBtn = new RectangleF(ClientSize.Width - bw - 6 * k, 0, bw, TopH);
+                maxBtn = new RectangleF(closeBtn.X - bw, 0, bw, TopH);
+                minBtn = new RectangleF(maxBtn.X - bw, 0, bw, TopH);
                 // 성별 필터 칩 (명단에 성별이 있을 때만)
                 filterR.Clear();
                 {
                     string[] fl = { "전체", "남학생", "여학생", gEdit ? "✓ 다 정했어요" : "성별 정하기" };
                     using (var f = new Font(fam, 16 * k, FontStyle.Bold, GraphicsUnit.Pixel))
                     {
-                        float ch = 40 * k, fx = closeBtn.X - 16 * k;
+                        float ch = 40 * k, fx = minBtn.X - 12 * k;
                         var ws = new float[4]; float tot = 0;
                         for (int j = 0; j < 4; j++) { ws[j] = g.MeasureString(fl[j], f).Width + 34 * k; tot += ws[j] + 8 * k; }
                         fx -= tot;
@@ -291,9 +296,28 @@ namespace ClassroomHud
                         }
                     }
                 }
-                using (var pen = new Pen(Ui.Ink, 2.5f * k))
+                // 최소화 · 최대화 · 닫기
+                if (hotBtn != 0)
                 {
-                    float c = 12 * k, cx = closeBtn.X + closeBtn.Width / 2, cy = TopH / 2;
+                    var hr = hotBtn == 1 ? minBtn : hotBtn == 2 ? maxBtn : closeBtn;
+                    var hb = new RectangleF(hr.X + 4 * k, (TopH - hr.Width + 8 * k) / 2, hr.Width - 8 * k, hr.Width - 8 * k);
+                    using (var pth = Painter.RoundPath(hb, 8 * k)) using (var br = new SolidBrush(hotBtn == 3 ? Color.FromArgb(255, 226, 226) : Color.FromArgb(225, 230, 250))) g.FillPath(br, pth);
+                }
+                using (var pen = new Pen(Ui.Ink, 2.2f * k) { StartCap = LineCap.Round, EndCap = LineCap.Round })
+                {
+                    float c = 9 * k, cy = TopH / 2;
+                    float cx = minBtn.X + minBtn.Width / 2; g.DrawLine(pen, cx - c, cy + c * 0.6f, cx + c, cy + c * 0.6f);
+                    cx = maxBtn.X + maxBtn.Width / 2;
+                    if (WindowState == FormWindowState.Maximized)
+                    {
+                        g.DrawRectangle(pen, cx - c, cy - c * 0.4f, c * 1.5f, c * 1.5f);
+                        g.DrawLines(pen, new[] { new PointF(cx - c * 0.5f, cy - c * 0.4f), new PointF(cx - c * 0.5f, cy - c), new PointF(cx + c, cy - c), new PointF(cx + c, cy + c * 0.5f), new PointF(cx + c * 0.5f, cy + c * 0.5f) });
+                    }
+                    else g.DrawRectangle(pen, cx - c, cy - c, c * 2, c * 2);
+                }
+                using (var pen = new Pen(Color.FromArgb(220, 70, 70), 2.5f * k) { StartCap = LineCap.Round, EndCap = LineCap.Round })
+                {
+                    float c = 10 * k, cx = closeBtn.X + closeBtn.Width / 2, cy = TopH / 2;
                     g.DrawLine(pen, cx - c, cy - c, cx + c, cy + c); g.DrawLine(pen, cx - c, cy + c, cx + c, cy - c);
                 }
                 for (int i = 0; i < cards.Count; i++)
@@ -576,6 +600,8 @@ namespace ClassroomHud
             try
             {
                 if (closeBtn.Contains(e.Location)) { Close(); return; }
+                if (minBtn.Contains(e.Location)) { WindowState = FormWindowState.Minimized; return; }
+                if (maxBtn.Contains(e.Location)) { ToggleMax(); return; }
                 foreach (var b in btns) if (b.R.Contains(e.Location)) { Act(b.Id); return; }
                 for (int j = 0; j < filterR.Count; j++)
                     if (filterR[j].Contains(e.Location))
@@ -612,8 +638,11 @@ namespace ClassroomHud
             base.OnMouseDown(e);
             // 위 제목 줄을 끌어 창 옮기기
             bool onChip = false; foreach (var r in filterR) if (r.Contains(e.Location)) onChip = true;
-            if (e.Y < TopH && !onChip && !closeBtn.Contains(e.Location) && e.Button == MouseButtons.Left)
+            bool onSys = closeBtn.Contains(e.Location) || maxBtn.Contains(e.Location) || minBtn.Contains(e.Location);
+            if (e.Y < TopH && !onChip && !onSys && e.Button == MouseButtons.Left)
             {
+                if (e.Clicks == 2) { ToggleMax(); return; }
+                if (WindowState == FormWindowState.Maximized) return;
                 ReleaseCapture(); SendMessage(Handle, 0xA1, new IntPtr(2), IntPtr.Zero);
             }
         }
@@ -621,11 +650,38 @@ namespace ClassroomHud
         protected override void OnMouseMove(MouseEventArgs e)
         {
             base.OnMouseMove(e);
-            bool over = closeBtn.Contains(e.Location);
+            int hb = closeBtn.Contains(e.Location) ? 3 : maxBtn.Contains(e.Location) ? 2 : minBtn.Contains(e.Location) ? 1 : 0;
+            if (hb != hotBtn) { hotBtn = hb; Invalidate(new Rectangle((int)minBtn.X, 0, (int)(closeBtn.Right - minBtn.X) + 1, (int)TopH + 1)); }
+            bool over = hb != 0;
             foreach (var b in btns) if (b.R.Contains(e.Location)) over = true;
             foreach (var r in filterR) if (r.Contains(e.Location)) over = true;
             if (phase == 0) foreach (var c in cards) if (c.Contains(e.Location)) over = true;
             Cursor = over ? Cursors.Hand : Cursors.Default;
+        }
+
+        int hotBtn;
+        protected override void OnMouseLeave(EventArgs e) { base.OnMouseLeave(e); if (hotBtn != 0) { hotBtn = 0; Invalidate(); } }
+
+        void ToggleMax()
+        {
+            WindowState = WindowState == FormWindowState.Maximized ? FormWindowState.Normal : FormWindowState.Maximized;
+            Layout2(); Invalidate();
+        }
+
+        // 가장자리를 끌어 창 크기 바꾸기
+        protected override void WndProc(ref Message m)
+        {
+            base.WndProc(ref m);
+            if (m.Msg == 0x84 && (int)m.Result == 1 && WindowState == FormWindowState.Normal)
+            {
+                var p = PointToClient(new Point((short)((long)m.LParam & 0xFFFF), (short)(((long)m.LParam >> 16) & 0xFFFF)));
+                int ed = (int)(8 * k);
+                bool L = p.X < ed, R = p.X >= ClientSize.Width - ed, T = p.Y < ed, B = p.Y >= ClientSize.Height - ed;
+                if (T && L) m.Result = (IntPtr)13; else if (T && R) m.Result = (IntPtr)14;
+                else if (B && L) m.Result = (IntPtr)16; else if (B && R) m.Result = (IntPtr)17;
+                else if (L) m.Result = (IntPtr)10; else if (R) m.Result = (IntPtr)11;
+                else if (T) m.Result = (IntPtr)12; else if (B) m.Result = (IntPtr)15;
+            }
         }
 
         void Act(string id)
