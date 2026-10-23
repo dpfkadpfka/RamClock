@@ -857,12 +857,30 @@ namespace ClassroomHud
         {
             try
             {
-                tray.ShowBalloonTip(8000, "RamClock 새 버전 " + v, "새 버전을 받아 두었어요. 다음에 켤 때부터 적용돼요.\n트레이 아이콘 메뉴의 [지금 업데이트]를 누르면 바로 바뀌어요.", ToolTipIcon.Info);
+                tray.ShowBalloonTip(8000, "RamClock 새 버전 " + v, "새 버전을 받아 두었어요. 쓰는 창이 없을 때 잠깐 다시 켜지며 바로 바뀌어요.", ToolTipIcon.Info);
+                StartAutoApply();
                 foreach (ToolStripItem it in tray.ContextMenuStrip.Items) if (it.Text != null && it.Text.StartsWith("지금 업데이트")) return;
                 var mi = new ToolStripMenuItem("지금 업데이트 (v" + v + ")", null, (s, e) => { Updater.Restart(); ExitApp(); }) { Font = new Font(menu.Font, FontStyle.Bold) };
                 tray.ContextMenuStrip.Items.Insert(0, mi);
             }
             catch (Exception ex) { Program.Log(ex); }
+        }
+
+        // 새 버전을 받았으면, 아무것도 하고 있지 않을 때(창·타이머·음악 없음) 몇 초 만에 다시 켜서 바로 적용
+        Timer autoApply;
+        void StartAutoApply()
+        {
+            if (autoApply != null) return;
+            autoApply = new Timer { Interval = 20000 };
+            autoApply.Tick += (o, e) =>
+            {
+                bool busy = settingsForm != null || toolOpen || settingsOpen || (memoEd != null && !memoEd.IsDisposed) || (music != null && !music.IsDisposed)
+                            || st.TRun || st.WRun || st.Hover || st.BannerLabel != null || Audio.Busy;
+                if (busy) return;
+                autoApply.Stop();
+                Updater.Restart(); ExitApp();
+            };
+            autoApply.Start();
         }
 
         void ExitApp()

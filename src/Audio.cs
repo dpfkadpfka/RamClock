@@ -243,8 +243,12 @@ namespace ClassroomHud
         }
 
         // 효과음 → (소리 파일이 있으면 파일, 없으면 글자 읽기)
+        static DateTime lastAnn = DateTime.MinValue;
+        public static bool Busy { get { return (DateTime.Now - lastAnn).TotalSeconds < 40; } }   // 방금 안내가 나갔으면 업데이트로 다시 켜지 않음
+
         public static void Announce(string text, string soundName, int times, bool sfx, bool voiceOn, int chimes = 1)
         {
+            lastAnn = DateTime.Now;
             Stop();
             if (sfx) Chime(chimes);
             if (!voiceOn) return;
