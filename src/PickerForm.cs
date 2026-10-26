@@ -77,9 +77,9 @@ namespace ClassroomHud
                 if (e.KeyCode == Keys.Escape) { if (phase == 2) Back(); else Close(); }
                 else if (e.KeyCode == Keys.Space || e.KeyCode == Keys.Enter) Act("draw");
             };
-            Resize += (o, e) => { Layout2(); Invalidate(); };
+            Resize += (o, e) => { if (WindowState == FormWindowState.Minimized) return; Layout2(); if (phase == 2) MakeBigCard(); Invalidate(); };
             MinimumSize = new Size((int)(640 * k), (int)(420 * k));
-            MaximizedBounds = screen;
+
         }
 
         public void ShowWithBackdrop() { Show(); Activate(); }
@@ -308,7 +308,7 @@ namespace ClassroomHud
                     float c = 9 * k, cy = TopH / 2;
                     float cx = minBtn.X + minBtn.Width / 2; g.DrawLine(pen, cx - c, cy + c * 0.6f, cx + c, cy + c * 0.6f);
                     cx = maxBtn.X + maxBtn.Width / 2;
-                    if (WindowState == FormWindowState.Maximized)
+                    if (maxed)
                     {
                         g.DrawRectangle(pen, cx - c, cy - c * 0.4f, c * 1.5f, c * 1.5f);
                         g.DrawLines(pen, new[] { new PointF(cx - c * 0.5f, cy - c * 0.4f), new PointF(cx - c * 0.5f, cy - c), new PointF(cx + c, cy - c), new PointF(cx + c, cy + c * 0.5f), new PointF(cx + c * 0.5f, cy + c * 0.5f) });
@@ -379,15 +379,14 @@ namespace ClassroomHud
             anim.Interval = 33; anim.Start();
         }
 
-        void Reveal()
+        // 뽑힌 카드 큰 그림: 창 크기에 맞춰 (창을 줄이거나 키우면 다시 그림)
+        void MakeBigCard()
         {
-            phase = 2; hi = result; lastPick = result;
-            t0 = DateTime.Now;
-            if (S.PickNoRepeat && !S.Picked.Contains(result)) { S.Picked.Add(result); if (save != null) save(); }
-            if (S.PickSound) Audio.PlayFanfare();
-            // 큰 카드는 한 번만 그려 둔다
-            if (bigCard != null) bigCard.Dispose();
-            float h = ClientSize.Height * 0.62f, w = h / 1.18f;
+            if (result < 1 || ClientSize.Width < 50 || ClientSize.Height < 50) return;
+            if (bigCard != null) { bigCard.Dispose(); bigCard = null; }
+            float areaH = ClientSize.Height - TopH - BottomH - 70 * k;
+            float h = Math.Min(areaH * 0.92f, ClientSize.Width * 0.8f * 1.18f);
+            h = Math.Max(60, h); float w = h / 1.18f;
             bigCard = new Bitmap((int)w, (int)h);
             using (var g = Graphics.FromImage(bigCard))
             {
@@ -398,6 +397,15 @@ namespace ClassroomHud
                 DrawCard(g, new RectangleF(0, 0, w, h), result, w / Math.Max(1, cards.Count > 0 ? cards[0].Width : w), photo);
                 if (photo != null) photo.Dispose();
             }
+        }
+
+        void Reveal()
+        {
+            phase = 2; hi = result; lastPick = result;
+            t0 = DateTime.Now;
+            if (S.PickNoRepeat && !S.Picked.Contains(result)) { S.Picked.Add(result); if (save != null) save(); }
+            if (S.PickSound) Audio.PlayFanfare();
+            MakeBigCard();
             RebuildGrid();
             if (S.PickEffect)
             {
@@ -642,7 +650,7 @@ namespace ClassroomHud
             if (e.Y < TopH && !onChip && !onSys && e.Button == MouseButtons.Left)
             {
                 if (e.Clicks == 2) { ToggleMax(); return; }
-                if (WindowState == FormWindowState.Maximized) return;
+                if (maxed) return;
                 ReleaseCapture(); SendMessage(Handle, 0xA1, new IntPtr(2), IntPtr.Zero);
             }
         }
@@ -662,17 +670,20 @@ namespace ClassroomHud
         int hotBtn;
         protected override void OnMouseLeave(EventArgs e) { base.OnMouseLeave(e); if (hotBtn != 0) { hotBtn = 0; Invalidate(); } }
 
+        bool maxed; Rectangle normalBounds;
         void ToggleMax()
         {
-            WindowState = WindowState == FormWindowState.Maximized ? FormWindowState.Normal : FormWindowState.Maximized;
-            Layout2(); Invalidate();
+            if (WindowState != FormWindowState.Normal) WindowState = FormWindowState.Normal;
+            if (!maxed) { normalBounds = Bounds; maxed = true; Bounds = Screen.FromControl(this).WorkingArea; }
+            else { maxed = false; Bounds = normalBounds; }
+            Invalidate();
         }
 
         // 가장자리를 끌어 창 크기 바꾸기
         protected override void WndProc(ref Message m)
         {
             base.WndProc(ref m);
-            if (m.Msg == 0x84 && (int)m.Result == 1 && WindowState == FormWindowState.Normal)
+            if (m.Msg == 0x84 && (int)m.Result == 1 && WindowState == FormWindowState.Normal && !maxed)
             {
                 var p = PointToClient(new Point((short)((long)m.LParam & 0xFFFF), (short)(((long)m.LParam >> 16) & 0xFFFF)));
                 int ed = (int)(8 * k);
