@@ -60,6 +60,7 @@ namespace ClassroomHud
             BuildTray();
             EnsurePosition();
             ApplyAutoStart();
+            StartProfileSync();
             tick = new Timer { Interval = 50 };
             tick.Tick += OnTick;
         }
@@ -502,8 +503,72 @@ namespace ClassroomHud
             var scr = Screen.FromPoint(new Point(S.X, S.Y)).WorkingArea;
             Lower();
             var f = new PickerForm(S, () => S.Save(), dpiK, scr);
-            f.FormClosed += (o, e) => { toolOpen = false; Raise(); BeginInvoke(new Action(() => f.Dispose())); };
+            picker = f;
+            f.OpenQr = OpenQr;
+            f.FormClosed += (o, e) => { toolOpen = false; picker = null; Raise(); BeginInvoke(new Action(() => f.Dispose())); };
             f.ShowWithBackdrop();
+        }
+
+        // ---------- 학생이 태블릿으로 자기 카드 꾸미기 ----------
+        PickerForm picker;
+        Form qrForm;
+        Timer profTimer;
+        DateTime lastProfPoll = DateTime.MinValue;
+
+        void StartProfileSync()
+        {
+            profTimer = new Timer { Interval = 15000 };
+            profTimer.Tick += (o, e) =>
+            {
+                bool qrOpen = qrForm != null && !qrForm.IsDisposed;
+                if (!qrOpen && (DateTime.Now - lastProfPoll).TotalMinutes < 5) return;
+                lastProfPoll = DateTime.Now;
+                ProfileSync.Poll(ProfileSync.Topic(S), S.ProfileSince, (list, last) =>
+                {
+                    try { BeginInvoke(new Action(() => ProfilesArrived(list, last))); } catch { }
+                });
+            };
+            profTimer.Start();
+        }
+
+        void ProfilesArrived(System.Collections.Generic.List<ProfileSync.Update> list, string last)
+        {
+            if (last != S.ProfileSince) { S.ProfileSince = last; S.Save(); }
+            if (list.Count == 0) return;
+            var msgs = ProfileSync.Apply(S, list);
+            S.Save();
+            if (picker != null && !picker.IsDisposed) picker.RefreshCards();
+            foreach (var m in msgs) QrLog(m);
+            if (qrForm == null || qrForm.IsDisposed) tray.ShowBalloonTip(5000, "학생 카드", string.Join("\n", msgs), ToolTipIcon.Info);
+        }
+
+        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+        void QrLogCore(string m) { ((QrForm)qrForm).AddLog(m); }
+        void QrLog(string m) { if (qrForm != null && !qrForm.IsDisposed) try { QrLogCore(m); } catch { } }
+
+        void OpenQr()
+        {
+            if (qrForm != null && !qrForm.IsDisposed) { qrForm.Activate(); return; }
+            string link = ProfileSync.StudentLink(S);
+            string why;
+            if (!Wv2.Available(out why))
+            {
+                Clipboard.SetText(link);
+                MessageBox.Show("학생들에게 아래 주소를 알려 주세요. (주소를 복사해 두었어요)\n\n" + link, "학생 카드 꾸미기");
+                lastProfPoll = DateTime.MinValue;
+                return;
+            }
+            try { qrForm = MakeQr(link); } catch (Exception ex) { Program.Log(ex); return; }
+            lastProfPoll = DateTime.MinValue;   // 바로 한 번 확인
+        }
+
+        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+        Form MakeQr(string link)
+        {
+            var f = new QrForm(string.IsNullOrWhiteSpace(S.ClassTitle) ? "우리 반" : S.ClassTitle.Trim(), link, dpiK);
+            f.Show();
+            Ui.BringUp(f);
+            return f;
         }
 
         // 위젯 바로 아래에서 메모 쓰기 (창 없이, 저장 버튼 없이)
@@ -629,6 +694,7 @@ namespace ClassroomHud
             t.Memo = S.Memo; t.MemoRuns = S.MemoRuns; t.MemoColor = S.MemoColor; t.MemoBgOn = S.MemoBgOn; t.MemoBgColor = S.MemoBgColor; t.MemoBgOpacity = S.MemoBgOpacity;
             t.MemoFont = S.MemoFont; t.MemoSize = S.MemoSize; t.MemoBold = S.MemoBold; t.MemoOutline = S.MemoOutline; t.MemoOutlineColor = S.MemoOutlineColor;
             t.Picked = S.Picked; t.PickEffect = S.PickEffect; t.PickSound = S.PickSound;
+            t.ClassCode = S.ClassCode; t.ProfileSince = S.ProfileSince;
         }
 
         void ApplySettings(Settings n)

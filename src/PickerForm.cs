@@ -94,6 +94,8 @@ namespace ClassroomHud
 
         public void ShowWithBackdrop() { Show(); Activate(); }
         public void DrawNow() { Act("draw"); }
+        public Action OpenQr;                 // 학생 카드 꾸미기 QR 창 열기
+        public void RefreshCards() { try { Layout2(); if (phase == 2) MakeBigCard(); Invalidate(); } catch { } }
 
         protected override void OnShown(EventArgs e) { base.OnShown(e); Layout2(); Invalidate(); Ui.BringUp(this); }
 
@@ -141,6 +143,7 @@ namespace ClassroomHud
         {
             var st = S.StudentOf(no);
             string name = st != null ? (st.Name ?? "").Trim() : "";
+            if (S.PickMode != 2 && st != null && !string.IsNullOrWhiteSpace(st.Nick)) return st.Nick.Trim();   // 학생이 정한 닉네임
             if (S.PickMode == 2 || name.Length == 0) return no + "번";
             return name;
         }
@@ -588,7 +591,7 @@ namespace ClassroomHud
             {
                 need = 0;
                 foreach (var b in list) need += Math.Max(g.MeasureString(b.Text, f0).Width + 70 * k, b.Primary ? 220 * k : 0);
-                need += 18 * k * 2 + 2 * (2 * 76 * k + 14 * k + 40 * k);
+                need += 18 * k * 2 + 2 * (3 * 76 * k + 28 * k + 40 * k);
             }
             bs = Math.Max(0.45f, Math.Min(1f, ClientSize.Width / need));
             float bh = 64 * k * bs, y = ClientSize.Height - BottomH + (BottomH - bh) / 2, gap = 18 * k * bs;
@@ -625,7 +628,8 @@ namespace ClassroomHud
             // 오른쪽 둥근 버튼: 추첨 효과, 소리
             float d = 76 * k * bs, rx = ClientSize.Width - 24 * k * bs - d;
             var right = new[] { new PBtn { Id = "sound", Text = S.PickSound ? "소리\n켬" : "소리\n끔", Round = true, On = S.PickSound },
-                                new PBtn { Id = "effect", Text = "추첨\n효과", Round = true, On = S.PickEffect } };
+                                new PBtn { Id = "effect", Text = "추첨\n효과", Round = true, On = S.PickEffect },
+                                new PBtn { Id = "qr", Text = "카드\n꾸미기", Round = true, On = false } };
             using (var f = PF(15 * k * bs, true))
                 foreach (var b in right)
                 {
@@ -753,6 +757,7 @@ namespace ClassroomHud
                 case "reset": S.Picked.Clear(); absent.Clear(); lastPick = -1; if (save != null) save(); Back(); RebuildGrid(); break;
                 case "effect": S.PickEffect = !S.PickEffect; if (save != null) save(); break;
                 case "sound": S.PickSound = !S.PickSound; if (save != null) save(); break;
+                case "qr": if (OpenQr != null) OpenQr(); break;
             }
             Invalidate();
         }

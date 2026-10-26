@@ -1134,6 +1134,10 @@ namespace ClassroomHud
             top.Controls.Add(chkNoRepeat);
             chkResetStart = new Toggle { Text = "프로그램을 켤 때마다 뽑힌 기록 지우기", AutoSize = true, Checked = R.PickResetOnStart, Margin = new Padding(3, 6, 10, 3) };
             top.Controls.Add(chkResetStart);
+            top.Controls.Add(new Label { Text = "우리 반 이름", AutoSize = true, Margin = new Padding(3, 9, 6, 3) });
+            txtClass = new TextBox { Width = 120, Text = R.ClassTitle ?? "", Margin = new Padding(3, 5, 3, 3) };
+            new ToolTip().SetToolTip(txtClass, "예: 2학년 1반 — 학생 카드 꾸미기 화면에 나와요");
+            top.Controls.Add(txtClass);
 
             gStu = NewGrid();
             gStu.Columns.Add(TextCol("번호", 10, true));
@@ -1142,6 +1146,7 @@ namespace ClassroomHud
             gStu.Columns.Add(TextCol("프로필 사진", 26, true));
             gStu.Columns.Add(BtnCol("사진…", 10));
             gStu.Columns.Add(BtnCol("사진 빼기", 10));
+            gStu.Columns.Add(TextCol("닉네임", 18));
             ResizeStudents(R.StudentCount);
             gStu.CellContentClick += (o, e) =>
             {
@@ -1186,6 +1191,7 @@ namespace ClassroomHud
 
         void UpdatePicked() { lPicked.Text = "지금까지 뽑힌 학생 " + R.Picked.Count + "명"; }
 
+        TextBox txtClass;
         void ResizeStudents(int n)
         {
             gStu.EndEdit();
@@ -1194,7 +1200,7 @@ namespace ClassroomHud
             {
                 int no = gStu.Rows.Count + 1;
                 var st = R.StudentOf(no);
-                int i = gStu.Rows.Add(no + "번", st != null ? st.Name : "", GenderText(st != null ? st.Gender : ""), ImageText(st != null ? st.Photo : ""));
+                int i = gStu.Rows.Add(no + "번", st != null ? st.Name : "", GenderText(st != null ? st.Gender : ""), ImageText(st != null ? st.Photo : ""), null, null, st != null ? st.Nick : "");
                 gStu.Rows[i].Tag = st != null ? st.Photo ?? "" : "";
             }
         }
@@ -1341,13 +1347,15 @@ namespace ClassroomHud
             R.PickMode = rbName.Checked ? 1 : rbNo.Checked ? 2 : 0;
             R.PickNoRepeat = chkNoRepeat.Checked;
             R.PickResetOnStart = chkResetStart.Checked;
+            R.ClassTitle = txtClass.Text.Trim();
             R.Students = new List<Student>();
             for (int i = 0; i < gStu.Rows.Count; i++)
             {
                 var row = gStu.Rows[i];
                 string name = (row.Cells[1].Value as string ?? "").Trim(), photo = row.Tag as string ?? "";
                 string gen = row.Cells[2].Value as string; if (gen != "남" && gen != "여") gen = "";
-                if (name.Length > 0 || photo.Length > 0 || gen.Length > 0) R.Students.Add(new Student(i + 1, name) { Photo = photo, Gender = gen });
+                string nick = (row.Cells[6].Value as string ?? "").Trim();
+                if (name.Length > 0 || photo.Length > 0 || gen.Length > 0 || nick.Length > 0) R.Students.Add(new Student(i + 1, name) { Photo = photo, Gender = gen, Nick = nick.Length > 0 ? nick : null });
             }
             R.Picked.RemoveAll(n => n > R.StudentCount);
         }

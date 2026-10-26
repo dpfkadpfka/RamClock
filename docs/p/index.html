@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>내 카드 만들기</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/fonts-archive/Freesentation/Freesentation.css">
+<style>
+:root{--bg:#f2f4ff;--card:#fff;--ink:#1c223a;--mut:#6a7290;--line:#dfe3f3;--acc:#4c63ff;--acc2:#a05cff;--ok:#1f9d6b;--bad:#d64545}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);font-family:"Freesentation","Malgun Gothic","Apple SD Gothic Neo",sans-serif;-webkit-text-size-adjust:100%}
+.wrap{max-width:720px;margin:0 auto;padding:24px max(16px,env(safe-area-inset-left)) 40px max(16px,env(safe-area-inset-right))}
+h1{font-size:30px;margin:4px 0 4px;font-weight:700;text-align:center}
+.sub{color:var(--mut);text-align:center;margin:0 0 18px;font-size:17px}
+.box{background:var(--card);border:1px solid var(--line);border-radius:20px;padding:20px;display:flex;flex-direction:column;gap:14px}
+h2{margin:0;font-size:21px}
+.nums{display:grid;grid-template-columns:repeat(auto-fill,minmax(58px,1fr));gap:8px}
+.nums button{height:58px;border-radius:14px;border:1px solid var(--line);background:#fff;font:inherit;font-size:21px;font-weight:700;color:var(--ink);cursor:pointer}
+.nums button.on{background:linear-gradient(135deg,var(--acc),var(--acc2));color:#fff;border-color:transparent}
+label{font-size:17px;color:var(--mut)}
+input[type=text]{width:100%;height:56px;border-radius:14px;border:1px solid var(--line);padding:0 16px;font:inherit;font-size:21px;color:var(--ink);background:#fff}
+input[type=text]:focus{outline:3px solid #c9d1ff;border-color:var(--acc)}
+.btn{height:60px;border:0;border-radius:30px;font:inherit;font-size:21px;font-weight:700;cursor:pointer;padding:0 26px}
+.pri{background:linear-gradient(90deg,var(--acc),var(--acc2));color:#fff}
+.pri:disabled{opacity:.45;cursor:default}
+.sec{background:#fff;border:1px solid var(--line);color:var(--ink)}
+.row{display:flex;gap:10px;flex-wrap:wrap}
+.row .btn{flex:1}
+.prev{display:flex;flex-direction:column;align-items:center;gap:10px}
+.ph{width:200px;height:200px;border-radius:28px;background:linear-gradient(135deg,#ffe6a8,#ffc9de);display:grid;place-items:center;overflow:hidden;font-size:80px;font-weight:700;color:#9a7a3a}
+.ph img{width:100%;height:100%;object-fit:cover}
+.nm{font-size:26px;font-weight:700}
+.msg{text-align:center;font-size:17px;min-height:22px}
+.msg.bad{color:var(--bad)}
+.done{text-align:center;padding:24px 8px}
+.done b{display:block;font-size:28px;margin-bottom:8px;color:var(--ok)}
+[hidden]{display:none!important}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1 id="title">내 카드 만들기</h1>
+  <p class="sub">뽑기 카드에 나올 내 사진과 닉네임을 정해요</p>
+
+  <div class="box" id="s1">
+    <h2>1. 내 번호를 눌러요</h2>
+    <div class="nums" id="nums"></div>
+    <label for="name">내 이름</label>
+    <input type="text" id="name" maxlength="10" placeholder="예: 김하늘" autocomplete="off">
+    <button class="btn pri" id="next" disabled>다음</button>
+  </div>
+
+  <div class="box" id="s2" hidden>
+    <h2>2. 사진과 닉네임을 정해요</h2>
+    <div class="prev"><div class="ph" id="ph">?</div><div class="nm" id="pnm"></div></div>
+    <input type="file" id="file" accept="image/*" hidden>
+    <button class="btn sec" id="pick">사진 찍기 · 고르기</button>
+    <label for="nick">닉네임 (안 쓰면 이름이 나와요)</label>
+    <input type="text" id="nick" maxlength="12" placeholder="예: 하늘이" autocomplete="off">
+    <div class="msg" id="msg"></div>
+    <div class="row"><button class="btn sec" id="back">← 번호 다시</button><button class="btn pri" id="send">보내기</button></div>
+  </div>
+
+  <div class="box done" id="s3" hidden>
+    <b>보냈어요!</b>
+    <p class="sub">선생님 화면에 곧 내 카드가 나와요.</p>
+    <button class="btn sec" id="again">다시 하기</button>
+  </div>
+
+  <div class="box" id="err" hidden><h2>선생님이 띄워 준 QR로 다시 들어와 주세요.</h2></div>
+</div>
+<script>
+(function(){
+  var q = new URLSearchParams(location.search);
+  var code = (q.get('c')||'').replace(/[^a-z0-9]/g,''), n = Math.max(1, Math.min(60, parseInt(q.get('n')||'25',10)||25)), t = q.get('t')||'우리 반';
+  var $ = function(id){ return document.getElementById(id); };
+  if (code.length < 8) { $('s1').hidden = true; $('err').hidden = false; return; }
+  $('title').textContent = t + ' 내 카드 만들기';
+  document.title = t + ' 내 카드 만들기';
+  var no = 0, blob = null;
+  var nums = $('nums');
+  for (var i = 1; i <= n; i++) {
+    var b = document.createElement('button'); b.textContent = i; b.dataset.n = i;
+    b.onclick = function(){ no = +this.dataset.n; [].forEach.call(nums.children, function(x){ x.classList.toggle('on', +x.dataset.n === no); }); check(); };
+    nums.appendChild(b);
+  }
+  function check(){ $('next').disabled = !(no > 0 && $('name').value.trim().length > 0); }
+  $('name').oninput = check;
+  function preview(){
+    var nm = $('nick').value.trim() || $('name').value.trim();
+    $('pnm').textContent = no + '번 ' + nm;
+    if (!blob) $('ph').textContent = nm ? nm.charAt(0) : '?';
+  }
+  $('next').onclick = function(){ $('s1').hidden = true; $('s2').hidden = false; preview(); window.scrollTo(0,0); };
+  $('back').onclick = function(){ $('s2').hidden = true; $('s1').hidden = false; };
+  $('nick').oninput = preview;
+  $('pick').onclick = function(){ $('file').click(); };
+  $('file').onchange = function(){
+    var f = this.files && this.files[0]; if (!f) return;
+    var img = new Image();
+    img.onload = function(){
+      // 가운데를 정사각형으로 잘라 480px로 줄임
+      var s = Math.min(img.naturalWidth, img.naturalHeight), c = document.createElement('canvas'); c.width = c.height = 480;
+      c.getContext('2d').drawImage(img, (img.naturalWidth - s) / 2, (img.naturalHeight - s) / 2, s, s, 0, 0, 480, 480);
+      c.toBlob(function(b){ blob = b; var u = URL.createObjectURL(b); $('ph').innerHTML = ''; var im = document.createElement('img'); im.src = u; $('ph').appendChild(im); }, 'image/jpeg', 0.85);
+      URL.revokeObjectURL(img.src);
+    };
+    img.src = URL.createObjectURL(f);
+  };
+  $('send').onclick = function(){
+    var btn = this; btn.disabled = true; $('msg').className = 'msg'; $('msg').textContent = '보내는 중…';
+    var data = JSON.stringify({ no: no, name: $('name').value.trim(), nick: $('nick').value.trim() });
+    var url = 'https://ntfy.sh/ramclock-' + code;
+    var req = blob
+      ? fetch(url + '?filename=card.jpg&message=' + encodeURIComponent(data), { method: 'PUT', body: blob })
+      : fetch(url, { method: 'POST', body: data });
+    req.then(function(r){ if (!r.ok) throw new Error(r.status); $('s2').hidden = true; $('s3').hidden = false; })
+       .catch(function(){ $('msg').className = 'msg bad'; $('msg').textContent = '보내지 못했어요. 인터넷을 확인하고 다시 눌러 주세요.'; })
+       .then(function(){ btn.disabled = false; });
+  };
+  $('again').onclick = function(){ location.reload(); };
+})();
+</script>
+</body>
+</html>
