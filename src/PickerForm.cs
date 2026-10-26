@@ -44,7 +44,14 @@ namespace ClassroomHud
             var st = S.StudentOf(no);
             return st != null && st.Gender == (gFilter == 1 ? "남" : "여");
         }
-        readonly FontFamily fam;
+        readonly FontFamily fam, famB, famR;
+        Font PF(float size, bool bold)
+        {
+            size = Math.Max(1f, size);
+            var f = bold ? famB : famR;
+            if (f != null) try { return new Font(f, size, FontStyle.Regular, GraphicsUnit.Pixel); } catch { }
+            return new Font(fam, size, bold ? FontStyle.Bold : FontStyle.Regular, GraphicsUnit.Pixel);
+        }
         List<RectangleF> cards = new List<RectangleF>();
         Bitmap grid;           // 카드 그리드를 미리 그려 둔 그림
         Bitmap bigCard;        // 뽑힌 카드 큰 그림
@@ -58,6 +65,9 @@ namespace ClassroomHud
         {
             S = s; save = saveCb; k = Math.Max(1f, dpiK);
             fam = Painter.UiFam;
+            // 뽑기 화면 글꼴: 프리젠테이션 (프로그램 안에 들어 있음)
+            famB = BuiltinFonts.Get("★ 프리젠테이션");
+            famR = BuiltinFonts.Get("★ 프리젠테이션 보통");
             FormBorderStyle = FormBorderStyle.None;
             ShowInTaskbar = true;
             Text = "랜덤 뽑기";
@@ -173,7 +183,7 @@ namespace ClassroomHud
                 {
                     using (var b = new LinearGradientBrush(ph, ControlPaint.Light(tint, 0.35f), tint, 120f)) g.FillPath(b, pp);
                     string big = S.PickMode == 2 || S.StudentOf(no) == null || string.IsNullOrWhiteSpace(S.StudentOf(no).Name) ? no.ToString() : S.StudentOf(no).Name.Trim().Substring(0, 1);
-                    using (var f = new Font(fam, ph.Height * 0.42f, FontStyle.Bold, GraphicsUnit.Pixel))
+                    using (var f = PF(ph.Height * 0.42f, true))
                     using (var tb = new SolidBrush(Color.FromArgb(170, Deep(tint))))
                     {
                         var sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center };
@@ -186,16 +196,16 @@ namespace ClassroomHud
                 float d = Math.Max(16, ph.Height * 0.2f);
                 var badge = new RectangleF(ph.X + 5 * scale, ph.Y + 5 * scale, d * 1.25f, d);
                 using (var p = Painter.RoundPath(badge, d / 2)) using (var b = new SolidBrush(Color.FromArgb(215, 255, 255, 255))) g.FillPath(b, p);
-                using (var f = new Font(fam, d * 0.55f, FontStyle.Bold, GraphicsUnit.Pixel))
+                using (var f = PF(d * 0.55f, true))
                     TextRenderer.DrawText(g, no.ToString(), f, Rectangle.Round(badge), Deep(tint), TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
             }
             string label = Label(no);
             float fs = nm.Height * 0.5f;
-            using (var f = new Font(fam, fs, FontStyle.Bold, GraphicsUnit.Pixel))
+            using (var f = PF(fs, true))
             {
                 var sz = g.MeasureString(label, f);
                 Font f2 = f;
-                if (sz.Width > nm.Width * 0.92f) f2 = new Font(fam, fs * nm.Width * 0.92f / sz.Width, FontStyle.Bold, GraphicsUnit.Pixel);
+                if (sz.Width > nm.Width * 0.92f) f2 = PF(fs * nm.Width * 0.92f / sz.Width, true);
                 var sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center };
                 using (var b = new SolidBrush(Ui.Ink)) g.DrawString(label, f2, b, nm, sf);
                 if (f2 != f) f2.Dispose();
@@ -228,7 +238,7 @@ namespace ClassroomHud
                 using (var sh = new SolidBrush(Color.FromArgb(60, 40, 20, 90))) { g.TranslateTransform(0, 2 * k); g.FillPath(sh, bp); g.TranslateTransform(0, -2 * k); }
                 using (var b = new LinearGradientBrush(band, Ui.Accent, Ui.Accent2, 0f)) g.FillPath(b, bp);
             }
-            using (var f = new Font(fam, Math.Max(9, rh * 0.52f), FontStyle.Bold, GraphicsUnit.Pixel))
+            using (var f = PF(Math.Max(9, rh * 0.52f), true))
             {
                 var sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center };
                 g.DrawString("★ 뽑기 당첨 ★", f, Brushes.White, band, sf);
@@ -250,12 +260,6 @@ namespace ClassroomHud
                 // 위 제목 줄 (유리)
                 using (var b = new SolidBrush(Color.FromArgb(150, 255, 255, 255))) g.FillRectangle(b, 0, 0, ClientSize.Width, TopH);
                 using (var pen = new Pen(Color.FromArgb(220, 255, 255, 255))) g.DrawLine(pen, 0, TopH - 1, ClientSize.Width, TopH - 1);
-                using (var f = new Font(fam, 22 * k, FontStyle.Bold, GraphicsUnit.Pixel))
-                using (var b = new LinearGradientBrush(new RectangleF(28 * k, 0, 140 * k, TopH), Ui.Accent, Ui.Accent2, 0f)) g.DrawString("랜덤 뽑기", f, b, 28 * k, (TopH - 30 * k) / 2);
-                int left = Pool().Count;
-                string info = gEdit ? "카드를 누를 때마다  남 → 여 → 빈칸  으로 바뀌어요" : (gFilter == 1 ? "남학생 · " : gFilter == 2 ? "여학생 · " : "") + (S.PickNoRepeat ? "남은 학생 " + left + "명 · " : "") + "전체 " + S.StudentCount + "명" + (absent.Count > 0 ? " · 제외 " + absent.Count + "명" : "") + "   (카드를 누르면 오늘 제외)";
-                using (var f = new Font(fam, 14 * k, FontStyle.Regular, GraphicsUnit.Pixel))
-                using (var b = new SolidBrush(Ui.Muted)) g.DrawString(info, f, b, 190 * k, (TopH - 18 * k) / 2);
                 float bw = TopH * 0.82f;
                 closeBtn = new RectangleF(ClientSize.Width - bw - 6 * k, 0, bw, TopH);
                 maxBtn = new RectangleF(closeBtn.X - bw, 0, bw, TopH);
@@ -264,12 +268,21 @@ namespace ClassroomHud
                 filterR.Clear();
                 {
                     string[] fl = { "전체", "남학생", "여학생", gEdit ? "✓ 다 정했어요" : "성별 정하기" };
-                    using (var f = new Font(fam, 16 * k, FontStyle.Bold, GraphicsUnit.Pixel))
+                    // 칩이 들어갈 자리가 모자라면 칩을 줄임
+                    float cs = 1f;
+                    using (var f0 = PF(16 * k, true))
                     {
-                        float ch = 40 * k, fx = minBtn.X - 12 * k;
+                        float t0 = 0; for (int j = 0; j < 4; j++) t0 += g.MeasureString(fl[j], f0).Width + 34 * k + 8 * k;
+                        float room = minBtn.X - 24 * k;
+                        cs = Math.Max(0.5f, Math.Min(1f, room / (t0 + 10 * k)));
+                    }
+                    using (var f = PF(16 * k * cs, true))
+                    {
+                        float ch = 40 * k * cs, fx = minBtn.X - 12 * k;
                         var ws = new float[4]; float tot = 0;
-                        for (int j = 0; j < 4; j++) { ws[j] = g.MeasureString(fl[j], f).Width + 34 * k; tot += ws[j] + 8 * k; }
+                        for (int j = 0; j < 4; j++) { ws[j] = g.MeasureString(fl[j], f).Width + 34 * k * cs; tot += ws[j] + 8 * k * cs; }
                         fx -= tot;
+                        chipsLeft = fx;
                         var sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center };
                         for (int j = 0; j < 4; j++)
                         {
@@ -292,7 +305,29 @@ namespace ClassroomHud
                             }
                             using (var br = new SolidBrush(on ? Color.White : Ui.Ink)) g.DrawString(fl[j], f, br, r, sf);
                             filterR.Add(r);
-                            fx += ws[j] + 8 * k;
+                            fx += ws[j] + 8 * k * cs;
+                        }
+                    }
+                }
+                // 제목·안내 글은 칩 왼쪽에 남은 자리만큼만 (넘치면 줄이거나 숨김)
+                {
+                    float room = chipsLeft - 28 * k - 12 * k;
+                    using (var f = PF(22 * k, true))
+                    {
+                        float tw = g.MeasureString("랜덤 뽑기", f).Width;
+                        if (tw <= room)
+                        {
+                            using (var b = new LinearGradientBrush(new RectangleF(28 * k, 0, 140 * k, TopH), Ui.Accent, Ui.Accent2, 0f)) g.DrawString("랜덤 뽑기", f, b, 28 * k, (TopH - 30 * k) / 2);
+                            float ix = 28 * k + tw + 16 * k, iw = chipsLeft - 12 * k - ix;
+                            if (iw > 80 * k)
+                            {
+                                int left = Pool().Count;
+                                string info = gEdit ? "카드를 누를 때마다  남 → 여 → 빈칸  으로 바뀌어요" : (gFilter == 1 ? "남학생 · " : gFilter == 2 ? "여학생 · " : "") + (S.PickNoRepeat ? "남은 학생 " + left + "명 · " : "") + "전체 " + S.StudentCount + "명" + (absent.Count > 0 ? " · 제외 " + absent.Count + "명" : "") + "   (카드를 누르면 오늘 제외)";
+                                using (var fi = PF(14 * k, false))
+                                using (var b = new SolidBrush(Ui.Muted))
+                                using (var sfi = new StringFormat { Trimming = StringTrimming.EllipsisCharacter, FormatFlags = StringFormatFlags.NoWrap, LineAlignment = StringAlignment.Center })
+                                    g.DrawString(info, fi, b, new RectangleF(ix, 0, iw, TopH), sfi);
+                            }
                         }
                     }
                 }
@@ -331,7 +366,7 @@ namespace ClassroomHud
                     if (off || other)
                     {
                         using (var p = Painter.RoundPath(cards[i], 16 * k)) using (var b = new SolidBrush(Color.FromArgb(190, 246, 247, 255))) g.FillPath(b, p);
-                        using (var f = new Font(fam, cards[i].Width * 0.15f, FontStyle.Bold, GraphicsUnit.Pixel))
+                        using (var f = PF(cards[i].Width * 0.15f, true))
                         {
                             var sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center };
                             using (var b = new SolidBrush(Ui.Muted)) g.DrawString(off ? "제외" : "", f, b, cards[i], sf);
@@ -348,7 +383,7 @@ namespace ClassroomHud
                         Color gc = gd == "남" ? Color.FromArgb(110, 160, 250) : gd == "여" ? Color.FromArgb(250, 120, 170) : Color.FromArgb(200, 200, 210);
                         using (var b = new SolidBrush(gc)) g.FillEllipse(b, cr);
                         using (var pen = new Pen(Color.White, 2 * k)) g.DrawEllipse(pen, cr);
-                        using (var f = new Font(fam, d * 0.5f, FontStyle.Bold, GraphicsUnit.Pixel))
+                        using (var f = PF(d * 0.5f, true))
                         using (var b = new SolidBrush(Color.White))
                             g.DrawString(gd == "" ? "?" : gd, f, b, cr, new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center });
                     }
@@ -498,7 +533,7 @@ namespace ClassroomHud
                 float sc = S.PickEffect ? Math.Max(0.05f, EaseOutBack(Math.Min(1f, t / 0.5f))) : 1f;
                 float w = bigCard.Width * sc, h = bigCard.Height * sc;
                 float cx = ClientSize.Width / 2f, cy = TopH + (ClientSize.Height - TopH - BottomH) / 2f + 14 * k;
-                using (var f = new Font(fam, 26 * k, FontStyle.Bold, GraphicsUnit.Pixel))
+                using (var f = PF(26 * k, true))
                 {
                     var sf = new StringFormat { Alignment = StringAlignment.Center };
                     var tr = new RectangleF(0, cy - bigCard.Height / 2f - 48 * k, ClientSize.Width, 40 * k);
@@ -528,7 +563,7 @@ namespace ClassroomHud
             if (phase == 0 && !gEdit && Pool().Count == 0)
             {
                 using (var b = new SolidBrush(Color.FromArgb(175, 240, 236, 255))) g.FillRectangle(b, 0, TopH, ClientSize.Width, ClientSize.Height - TopH - BottomH);
-                using (var f = new Font(fam, 32 * k, FontStyle.Bold, GraphicsUnit.Pixel))
+                using (var f = PF(32 * k, true))
                 using (var tb = new SolidBrush(Ui.Ink))
                 {
                     var sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center };
@@ -539,18 +574,28 @@ namespace ClassroomHud
             DrawButtons(g);
         }
 
+        float bs = 1f, chipsLeft;   // 아래 버튼 줄 크기 비율
         void DrawButtons(Graphics g)
         {
             btns.Clear();
-            float bh = 64 * k, y = ClientSize.Height - BottomH + (BottomH - bh) / 2, gap = 18 * k;
             var list = new List<PBtn> {
                 new PBtn { Id = "back", Text = "←  다시 선택하기" },
                 new PBtn { Id = "draw", Text = phase == 1 ? "뽑는 중…" : "뽑기", Primary = true },
                 new PBtn { Id = "reset", Text = "↻  초기화하기" } };
-            using (var f = new Font(fam, 24 * k, FontStyle.Bold, GraphicsUnit.Pixel))
+            // 창이 좁으면 아래 버튼 줄 전체를 같이 줄임 (겹치지 않게)
+            float need;
+            using (var f0 = PF(24 * k, true))
+            {
+                need = 0;
+                foreach (var b in list) need += Math.Max(g.MeasureString(b.Text, f0).Width + 70 * k, b.Primary ? 220 * k : 0);
+                need += 18 * k * 2 + 2 * (2 * 76 * k + 14 * k + 40 * k);
+            }
+            bs = Math.Max(0.45f, Math.Min(1f, ClientSize.Width / need));
+            float bh = 64 * k * bs, y = ClientSize.Height - BottomH + (BottomH - bh) / 2, gap = 18 * k * bs;
+            using (var f = PF(24 * k * bs, true))
             {
                 float total = 0;
-                foreach (var b in list) { b.R = new RectangleF(0, 0, Math.Max(g.MeasureString(b.Text, f).Width + 70 * k, b.Primary ? 220 * k : 0), bh); total += b.R.Width; }
+                foreach (var b in list) { b.R = new RectangleF(0, 0, Math.Max(g.MeasureString(b.Text, f).Width + 70 * k * bs, b.Primary ? 220 * k * bs : 0), bh); total += b.R.Width; }
                 total += gap * (list.Count - 1);
                 float x = (ClientSize.Width - total) / 2;
                 var sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center };
@@ -578,10 +623,10 @@ namespace ClassroomHud
                 }
             }
             // 오른쪽 둥근 버튼: 추첨 효과, 소리
-            float d = 76 * k, rx = ClientSize.Width - 24 * k - d;
+            float d = 76 * k * bs, rx = ClientSize.Width - 24 * k * bs - d;
             var right = new[] { new PBtn { Id = "sound", Text = S.PickSound ? "소리\n켬" : "소리\n끔", Round = true, On = S.PickSound },
                                 new PBtn { Id = "effect", Text = "추첨\n효과", Round = true, On = S.PickEffect } };
-            using (var f = new Font(fam, 15 * k, FontStyle.Bold, GraphicsUnit.Pixel))
+            using (var f = PF(15 * k * bs, true))
                 foreach (var b in right)
                 {
                     b.R = new RectangleF(rx, ClientSize.Height - BottomH + (BottomH - d) / 2, d, d);
@@ -592,13 +637,14 @@ namespace ClassroomHud
                     using (var br = new SolidBrush(b.On ? Ui.Accent : Ui.Muted)) g.DrawString(b.Text, f, br, b.R, sf);
                     if (b.On)
                     {
-                        var chk = new RectangleF(b.R.X - 2 * k, b.R.Y - 2 * k, 24 * k, 24 * k);
+                        float kk = k * bs;
+                        var chk = new RectangleF(b.R.X - 2 * kk, b.R.Y - 2 * kk, 24 * kk, 24 * kk);
                         using (var br = new LinearGradientBrush(chk, Ui.Accent, Ui.Accent2, 45f)) g.FillEllipse(br, chk);
-                        using (var pen = new Pen(Color.White, 2.5f * k))
-                            g.DrawLines(pen, new[] { new PointF(chk.X + 6 * k, chk.Y + 12 * k), new PointF(chk.X + 10 * k, chk.Y + 16 * k), new PointF(chk.X + 18 * k, chk.Y + 8 * k) });
+                        using (var pen = new Pen(Color.White, 2.5f * kk))
+                            g.DrawLines(pen, new[] { new PointF(chk.X + 6 * kk, chk.Y + 12 * kk), new PointF(chk.X + 10 * kk, chk.Y + 16 * kk), new PointF(chk.X + 18 * kk, chk.Y + 8 * kk) });
                     }
                     btns.Add(b);
-                    rx -= d + 14 * k;
+                    rx -= d + 14 * k * bs;
                 }
         }
 
