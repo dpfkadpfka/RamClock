@@ -48,6 +48,7 @@ namespace ClassroomHud
         public float StickW; public string StickKey;
         public bool Maximized; public int MaxPrevX, MaxPrevY; public float MaxPrevScale;   // 크게 보기
         public bool MusicOpen;                        // 음악 미니 플레이어가 열려 있음
+        public bool NoiseOpen, VoteOpen;              // 소음 신호등·투표 창이 열려 있음
         public int MusicH, MusicMinW;                 // 플레이어 높이·최소 폭 (0이면 닫힘)
         public bool MemoEdit;                         // 위젯에서 바로 메모를 쓰는 중   // 폭이 매초 바뀌어 흔들리지 않도록
 
@@ -605,7 +606,7 @@ namespace ClassroomHud
             var tools = new List<Btn>();
             foreach (var t in Settings.ToolList)
                 if (S.Tools == null || S.Tools.Contains(t[0]))
-                    tools.Add(B(t[0], t[1], (t[0] == "msgs" && st.Popup == 2) || (t[0] == "memo" && st.MemoEdit) || (t[0] == "music" && st.MusicOpen)));
+                    tools.Add(B(t[0], t[1], (t[0] == "msgs" && st.Popup == 2) || (t[0] == "memo" && st.MemoEdit) || (t[0] == "music" && st.MusicOpen) || (t[0] == "noise" && st.NoiseOpen) || (t[0] == "vote" && st.VoteOpen)));
             foreach (var b0 in tools) b0.Glyph = true;
             if (tools.Count > 0) { var gt = G(null, false, tools.ToArray()); gt.Slot = "tools"; gs.Add(gt); }
 
@@ -1172,6 +1173,13 @@ namespace ClassroomHud
                         PL(new float[] { 4, 5.5f, 4, 4, 15, 4, 15, 5.5f }); L(9.5f, 4, 9.5f, 18); L(7.5f, 18, 11.5f, 18);
                         { var pts = new[] { P(14, 20), P(15, 16.5f), P(20.5f, 11), P(23, 13.5f), P(17.5f, 19) }; g.DrawPolygon(pen, pts); }
                         break;
+                    case "noise": // 소음 신호등
+                        RR(7, 2, 10, 20, 3); DOT(12, 7, 2.2f); DOT(12, 12, 2.2f); DOT(12, 17, 2.2f); break;
+                    case "meal":  // 오늘 급식: 숟가락·포크
+                        L(7, 3, 7, 21); PL(new float[] { 4, 3, 4, 8, 7, 10, 10, 8, 10, 3 });
+                        g.DrawEllipse(pen, ox + 14 * f, oy + 3 * f, 5 * f, 8 * f); L(16.5f, 11, 16.5f, 21); break;
+                    case "vote":  // 투표: 막대그래프
+                        L(3, 21, 21, 21); RR(5, 12, 4, 8, 1); RR(10, 6, 4, 14, 1); RR(15, 9, 4, 11, 1); break;
                     case "music": // 음악: 음표
                         PL(new float[] { 9, 18, 9, 5.5f, 20, 3, 20, 15.5f }); CI(6.5f, 18, 2.5f); CI(17.5f, 15.5f, 2.5f); break;
                     case "msgs": // 선생님 안내: 확성기

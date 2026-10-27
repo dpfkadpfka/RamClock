@@ -89,6 +89,7 @@ namespace ClassroomHud
         public string Photo { get; set; }
         public string Gender { get; set; }   // "남", "여", 또는 빈칸
         public string Nick { get; set; }     // 학생이 직접 정한 닉네임 (태블릿 링크로)
+        public string Birthday { get; set; } // 생일 "MM-dd"
         public Student() { }
         public Student(int no, string name) { No = no; Name = name; }
     }
@@ -161,7 +162,18 @@ namespace ClassroomHud
         // 학생이 태블릿으로 자기 카드(사진·닉네임) 꾸미기
         public string ClassCode { get; set; }     // 우리 반 비밀 주소 (처음 한 번 만들어짐)
         public string ClassTitle { get; set; }    // 예: 2학년 1반
-        public string ProfileSince { get; set; }  // 마지막으로 받은 메시지 id   // 부분 꾸미기 (없거나 글이 안 맞으면 전체 꾸미기만)
+        public string ProfileSince { get; set; }  // 마지막으로 받은 메시지 id
+        public bool BirthdayOn { get; set; } = true;   // 생일날 아침 축하 안내
+        // 소음 신호등 기준 (0~100)
+        public int NoiseYellow { get; set; } = 45;
+        public int NoiseRed { get; set; } = 70;
+        public bool NoiseVoice { get; set; } = true;
+        // 오늘 급식 (나이스)
+        public string SchoolName { get; set; } = "";
+        public string SchoolOffice { get; set; }   // 시도교육청 코드 (예: J10)
+        public string SchoolCode { get; set; }     // 학교 코드
+        public bool MealAtLunch { get; set; } = true;   // 점심시간 시작할 때 메뉴 보여 주기
+        public bool NewToolsAdded { get; set; }   // 부분 꾸미기 (없거나 글이 안 맞으면 전체 꾸미기만)
         public bool MemoOutline { get; set; }
         public string MemoOutlineColor { get; set; } = "#FFFFFF";
         public string ClockFontName { get; set; } = "";     // 비우면 글자 글꼴과 같게
@@ -197,7 +209,7 @@ namespace ClassroomHud
         public int MusicDY { get; set; }
         public bool MusicToolAdded { get; set; }
         public List<string> Tools { get; set; }       // 시계 아래 [교실 도구]에 보일 버튼
-        public static readonly string[][] ToolList = { new[] { "msgs", "선생님 안내" }, new[] { "pick", "뽑기" }, new[] { "memo", "텍스트" }, new[] { "week", "이번 주" }, new[] { "music", "음악" } };
+        public static readonly string[][] ToolList = { new[] { "msgs", "선생님 안내" }, new[] { "pick", "뽑기" }, new[] { "memo", "텍스트" }, new[] { "week", "이번 주" }, new[] { "music", "음악" }, new[] { "noise", "소음 신호등" }, new[] { "meal", "오늘 급식" }, new[] { "vote", "투표" } };
         public static List<QuickLink> DefaultLinks()
         {
             return new List<QuickLink> { new QuickLink("아이스크림", "https://www.i-scream.co.kr"), new QuickLink("유튜브", "https://www.youtube.com") };
@@ -294,6 +306,8 @@ namespace ClassroomHud
             if (Tools == null) Tools = new List<string> { "pick", "memo" };   // 처음에는 뽑기·텍스트만
             if (!MusicToolAdded) { if (!Tools.Contains("music")) Tools.Add("music"); MusicToolAdded = true; }
             if (Playlists == null) Playlists = new List<QuickLink>();
+            if (!NewToolsAdded) { foreach (var t in new[] { "noise", "meal", "vote" }) if (!Tools.Contains(t)) Tools.Add(t); NewToolsAdded = true; }
+            NoiseYellow = Math.Max(5, Math.Min(90, NoiseYellow)); NoiseRed = Math.Max(NoiseYellow + 5, Math.Min(98, NoiseRed));
             if (string.IsNullOrEmpty(ClassCode))
             {
                 const string cs = "abcdefghjkmnpqrstuvwxyz23456789"; var rnd = new Random(Guid.NewGuid().GetHashCode()); var sb = new System.Text.StringBuilder();

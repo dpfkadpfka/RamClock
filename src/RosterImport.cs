@@ -38,6 +38,25 @@ namespace ClassroomHud
             catch (Exception ex) { msg = "파일을 읽지 못했어요. 엑셀에서 열려 있다면 닫고 다시 해 주세요.\n(" + ex.Message + ")"; return null; }
         }
 
+        // 파일 속 표들을 그대로 (생일 명단 읽기 등에 씀)
+        public static List<List<List<string>>> Grids(string path, out string msg)
+        {
+            msg = null;
+            string ext = Path.GetExtension(path).ToLowerInvariant();
+            var res = new List<List<List<string>>>();
+            if (ext == ".csv" || ext == ".tsv") { res.Add(ReadCsv(path)); return res; }
+            if (ext == ".xlsx" || ext == ".xlsm" || ext == ".xls" || ext == ".cell" || ext == ".ods")
+            {
+                string x = path;
+                if (ext != ".xlsx" && ext != ".xlsm") { x = ConvertWithExcel(path); if (x == null) { msg = "이 파일 형식(" + ext + ")은 엑셀이나 한셀이 있어야 읽을 수 있어요."; return res; } }
+                res.Add(ReadXlsx(x, new Dictionary<int, KeyValuePair<byte[], string>>()));
+                return res;
+            }
+            if (ext == ".hwpx" || ext == ".hwp") return HwpxWeek.Tables(path, out msg);
+            msg = "엑셀·CSV·한글(hwpx) 파일이나 글(.txt)로 넣어 주세요.";
+            return res;
+        }
+
         // ---------- 표 해석 ----------
         static List<RosterRow> Interpret(List<List<string>> g, Dictionary<int, KeyValuePair<byte[], string>> pics)
         {

@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using System.IO;
 using System;
 using System.Collections.Generic;
@@ -1147,6 +1148,15 @@ namespace ClassroomHud
             gStu.Columns.Add(BtnCol("사진…", 10));
             gStu.Columns.Add(BtnCol("사진 빼기", 10));
             gStu.Columns.Add(TextCol("닉네임", 18));
+            gStu.Columns.Add(TextCol("생일", 14));
+            gStu.CellEndEdit += (o, e) =>
+            {
+                if (e.RowIndex < 0 || e.ColumnIndex != 7) return;
+                var c = gStu.Rows[e.RowIndex].Cells[7]; string v = (c.Value as string ?? "").Trim();
+                if (v.Length == 0) { c.Style.BackColor = Color.Empty; return; }
+                var md = Birthdays.ParseMD(v);
+                if (md != null) { c.Value = Birthdays.Show(md); c.Style.BackColor = Color.Empty; } else c.Style.BackColor = Color.MistyRose;
+            };
             ResizeStudents(R.StudentCount);
             gStu.CellContentClick += (o, e) =>
             {
@@ -1169,12 +1179,16 @@ namespace ClassroomHud
             bPhotos.Click += (o, e) => ImportPhotos();
             var bPaste = B("붙여 넣기…");
             bPaste.Click += (o, e) => PasteNames();
+            var bBirth = B("생일 명단 넣기…");
+            bBirth.Click += (o, e) => ImportBirthdays(null);
+            var bBirthList = B("생일 목록");
+            bBirthList.Click += (o, e) => { CommitPick(); using (var d = new BirthdayListForm(R)) d.ShowDialog(this); };
             var bClear = B("이름 모두 지우기");
             bClear.Click += (o, e) => { foreach (DataGridViewRow r in gStu.Rows) r.Cells[1].Value = ""; };
             lPicked = new Label { AutoSize = true, Margin = new Padding(16, 9, 6, 3), ForeColor = Color.DimGray };
             var bReset = B("뽑힌 기록 지우기");
             bReset.Click += (o, e) => { R.Picked.Clear(); UpdatePicked(); };
-            bar.Controls.AddRange(new Control[] { bTpl, bXl, bPhotos, bPaste, bClear, lPicked, bReset });
+            bar.Controls.AddRange(new Control[] { bTpl, bXl, bPhotos, bBirth, bBirthList, bPaste, bClear, lPicked, bReset });
             UpdatePicked();
             var note = Note("[엑셀로 명단 넣기]는 나이스 명렬표처럼 번호·성명·성별 열이 있는 파일을 그대로 읽어요. 엑셀 칸에 사진을 넣어 두면 사진도 함께 들어가요. 사진 파일만 따로 있으면 [사진 한꺼번에 넣기]로 여러 장을 고르세요(파일 이름에 이름이나 번호). 이름을 비워 두면 번호로 뽑아요. 성별을 정해 두면 뽑기 창에서 [남자만]·[여자만]으로 뽑을 수 있어요. 프로필 사진을 넣으면 뽑힐 때 사진도 함께 나와요. 위젯의 [뽑기]를 누르면 시작해요.");
             Page("뽑기 도구", new Control[] { top, gStu, bar, note }, new float[] { 0, 100, 0, 0 });
@@ -1200,7 +1214,7 @@ namespace ClassroomHud
             {
                 int no = gStu.Rows.Count + 1;
                 var st = R.StudentOf(no);
-                int i = gStu.Rows.Add(no + "번", st != null ? st.Name : "", GenderText(st != null ? st.Gender : ""), ImageText(st != null ? st.Photo : ""), null, null, st != null ? st.Nick : "");
+                int i = gStu.Rows.Add(no + "번", st != null ? st.Name : "", GenderText(st != null ? st.Gender : ""), ImageText(st != null ? st.Photo : ""), null, null, st != null ? st.Nick : "", st != null ? Birthdays.Show(st.Birthday) : "");
                 gStu.Rows[i].Tag = st != null ? st.Photo ?? "" : "";
             }
         }
@@ -1261,7 +1275,45 @@ namespace ClassroomHud
                     catch { }
                 }
             }
-            MessageBox.Show(this, rows.Count + "명을 넣었어요." + (gens > 0 ? "\n성별 " + gens + "명" : "") + (photos > 0 ? "\n사진 " + photos + "장" : "") + "\n\n[저장]을 누르면 적용돼요.", "RamClock", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            int bds = ImportBirthdays(path, true);
+            MessageBox.Show(this, rows.Count + "명을 넣었어요." + (gens > 0 ? "\n성별 " + gens + "명" : "") + (photos > 0 ? "\n사진 " + photos + "장" : "") + (bds > 0 ? "\n생일 " + bds + "명" : "") + "\n\n[저장]을 누르면 적용돼요.", "RamClock", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        }
+
+        // 생일 명단: 엑셀·CSV·한글·글 파일에서 번호/이름/생일을 알아서 찾아 표에 넣기
+        int ImportBirthdays(string path, bool quiet = false)
+        {
+            if (path == null)
+                using (var od = new OpenFileDialog { Filter = "생일 명단 (엑셀·CSV·한글·글)|*.xlsx;*.xlsm;*.xls;*.csv;*.hwpx;*.hwp;*.txt;*.cell|모든 파일|*.*", Title = "생일 명단 파일 고르기" })
+                {
+                    if (od.ShowDialog(this) != DialogResult.OK) return 0;
+                    path = od.FileName;
+                }
+            string msg; List<Birthdays.Row> list;
+            Cursor = Cursors.WaitCursor;
+            try { list = Birthdays.Read(path, out msg); } finally { Cursor = Cursors.Default; }
+            gStu.EndEdit();
+            int done = 0; var miss = new List<string>();
+            foreach (var r in list)
+            {
+                int idx = -1;
+                string nm = Regex.Replace(r.Name ?? "", @"\s", "");
+                // 이름이 있으면 이름으로 먼저 찾고, 없으면 번호로
+                if (nm.Length > 0)
+                    for (int i = 0; i < gStu.Rows.Count; i++)
+                        if (Regex.Replace(gStu.Rows[i].Cells[1].Value as string ?? "", @"\s", "") == nm) { idx = i; break; }
+                if (idx < 0 && r.No >= 1 && r.No <= gStu.Rows.Count && (nm.Length == 0 || string.IsNullOrWhiteSpace(gStu.Rows[r.No - 1].Cells[1].Value as string))) idx = r.No - 1;
+                if (idx < 0) { miss.Add((r.No > 0 ? r.No + "번 " : "") + r.Name); continue; }
+                var row = gStu.Rows[idx];
+                if (nm.Length > 0 && string.IsNullOrWhiteSpace(row.Cells[1].Value as string)) row.Cells[1].Value = r.Name;
+                row.Cells[7].Value = Birthdays.Show(r.MD); row.Cells[7].Style.BackColor = Color.Empty;
+                done++;
+            }
+            if (!quiet)
+            {
+                if (list.Count == 0) MessageBox.Show(this, msg ?? "생일을 찾지 못했어요.", "RamClock", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                else MessageBox.Show(this, "생일 " + done + "명을 넣었어요." + (miss.Count > 0 ? "\n\n명단에서 찾지 못한 학생: " + string.Join(", ", miss) : "") + "\n\n[저장]을 누르면 적용돼요.", "RamClock", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+            return done;
         }
 
         static string Safe(string s) { foreach (char c in Path.GetInvalidFileNameChars()) s = s.Replace(c, '_'); return s; }
@@ -1355,7 +1407,8 @@ namespace ClassroomHud
                 string name = (row.Cells[1].Value as string ?? "").Trim(), photo = row.Tag as string ?? "";
                 string gen = row.Cells[2].Value as string; if (gen != "남" && gen != "여") gen = "";
                 string nick = (row.Cells[6].Value as string ?? "").Trim();
-                if (name.Length > 0 || photo.Length > 0 || gen.Length > 0 || nick.Length > 0) R.Students.Add(new Student(i + 1, name) { Photo = photo, Gender = gen, Nick = nick.Length > 0 ? nick : null });
+                string bd = Birthdays.ParseMD(row.Cells[7].Value as string);
+                if (name.Length > 0 || photo.Length > 0 || gen.Length > 0 || nick.Length > 0 || bd != null) R.Students.Add(new Student(i + 1, name) { Photo = photo, Gender = gen, Nick = nick.Length > 0 ? nick : null, Birthday = bd });
             }
             R.Picked.RemoveAll(n => n > R.StudentCount);
         }

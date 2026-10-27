@@ -15,7 +15,7 @@ namespace ClassroomHud
         public const string PageUrl = "https://dpfkadpfka.github.io/RamClock/p/";
 
         // 받는 서버 (시험할 때만 RAMCLOCK_NTFY로 바꿈)
-        static string Server { get { var e = Environment.GetEnvironmentVariable("RAMCLOCK_NTFY"); return string.IsNullOrEmpty(e) ? "https://ntfy.sh" : e; } }
+        public static string Server { get { var e = Environment.GetEnvironmentVariable("RAMCLOCK_NTFY"); return string.IsNullOrEmpty(e) ? "https://ntfy.sh" : e; } }
 
         public class Update { public int No; public string Name, Nick, Photo; }
 

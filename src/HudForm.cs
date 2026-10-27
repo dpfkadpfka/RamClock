@@ -232,6 +232,26 @@ namespace ClassroomHud
             if (dk != lastDayKey) { lastDayKey = dk; fired.Clear(); lastSec = sec; return; }
             if (sec <= lastSec) { lastSec = Math.Min(lastSec, sec); return; }
             int dow = (int)now.DayOfWeek;
+            // 생일 축하: 학교 오는 날 아침 8시 30분 (늦게 켜면 켜자마자, 오후 5시까지)
+            if (dow >= 1 && dow <= 5 && S.BirthdayOn && sec >= 8 * 3600 + 30 * 60 && sec < 17 * 3600 && !fired.Contains("bday"))
+            {
+                fired.Add("bday");
+                bool wk; var bl = Birthdays.Today(S, now, out wk);
+                if (bl.Count > 0)
+                {
+                    var names = new List<string>(); string photo = null;
+                    foreach (var b in bl) { names.Add(Birthdays.NameOf(b)); if (photo == null && Settings.MediaPath(b.Photo) != null) photo = b.Photo; }
+                    string who = string.Join(", ", names);
+                    string text = (wk ? "지난 주말과 오늘 " : "오늘은 ") + who + "의 생일이에요! 다 함께 축하해 주세요";
+                    ShowBanner("생일 축하해요", text, 60, photo);
+                    Audio.Announce(text, null, 1, S.Sfx, S.Voice, 3);
+                    ver++;
+                }
+            }
+            // 점심시간 시작할 때 오늘 급식 메뉴
+            if (dow >= 1 && dow <= 5 && S.MealAtLunch && !string.IsNullOrEmpty(S.SchoolCode) && !fired.Contains("meal"))
+                foreach (var sl in Sched.Slots(S, now))
+                    if (sl.Type == "lunch" && sec >= sl.StartMin * 60 && sec < sl.StartMin * 60 + 60) { fired.Add("meal"); ShowMeal(false); break; }
             if (dow >= 1 && dow <= 5)
             {
                 foreach (var ev in Sched.DayEvents(S, now))
@@ -429,6 +449,9 @@ namespace ClassroomHud
                 case "week": OpenWeek(); return;
                 case "memo": OpenMemo(); return;
                 case "music": OpenMusic(null); return;
+                case "noise": ToggleNoise(); return;
+                case "meal": ShowMeal(true); return;
+                case "vote": OpenVote(); return;
                 case "msgs": st.Popup = st.Popup == 2 ? 0 : 2; break;
                 case "readable": S.Readable = !S.Readable; S.Save(); break;
                 case "lock": S.Locked = !S.Locked; S.Save(); break;
@@ -509,6 +532,52 @@ namespace ClassroomHud
             BeginInvoke(new Action(() => PollProfiles(false)));   // 뽑기 창을 열면 바로 한 번 받기
             f.FormClosed += (o, e) => { toolOpen = false; picker = null; Raise(); BeginInvoke(new Action(() => f.Dispose())); };
             f.ShowWithBackdrop();
+        }
+
+        // ---------- 오늘 급식 ----------
+        // force: 버튼으로 연 경우(학교가 안 정해졌으면 고르게 하고, 실패도 알림)
+        void ShowMeal(bool force)
+        {
+            st.Hover = false; ver++; Render(true);
+            if (string.IsNullOrEmpty(S.SchoolCode))
+            {
+                if (!force) return;
+                Lower();
+                bool ok = MealService.PickSchool(this, S);
+                Raise();
+                if (!ok) return;
+                S.Save();
+            }
+            string office = S.SchoolOffice, code = S.SchoolCode;
+            new System.Threading.Thread(() =>
+            {
+                List<string> menu = null; string kcal = null, err = null;
+                try { menu = MealService.Menu(office, code, DateTime.Today, out kcal); } catch (Exception ex) { err = ex.Message; Program.Log(ex); }
+                try
+                {
+                    BeginInvoke(new Action(() =>
+                    {
+                        if (err != null) { if (force) ShowBanner("오늘 급식", "급식 메뉴를 받아 오지 못했어요. 인터넷 연결을 확인해 주세요.", 10); ver++; return; }
+                        if (menu == null || menu.Count == 0) { if (force) ShowBanner("오늘 급식", "오늘은 급식 정보가 없어요.", 8); ver++; return; }
+                        string text = string.Join("  ·  ", menu);
+                        ShowBanner("오늘 급식" + (kcal != null ? "  " + kcal : ""), text, force ? 25 : 40);
+                        if (!force) Audio.Announce("오늘 점심은 " + string.Join(", ", menu) + "입니다. 맛있게 먹어요.", null, 1, S.Sfx, S.Voice);
+                        ver++; Render(true);
+                    }));
+                }
+                catch { }
+            }) { IsBackground = true }.Start();
+        }
+
+        // ---------- 소음 신호등 ----------
+        NoiseForm noiseForm;
+        void ToggleNoise()
+        {
+            if (noiseForm != null && !noiseForm.IsDisposed) { noiseForm.Close(); return; }
+            noiseForm = new NoiseForm(S, () => S.Save(), dpiK);
+            noiseForm.FormClosed += (o, e) => { noiseForm = null; st.NoiseOpen = false; ver++; Render(true); };
+            st.NoiseOpen = true; st.Hover = false; ver++; Render(true);
+            noiseForm.Show();
         }
 
         // ---------- 학생이 태블릿으로 자기 카드 꾸미기 ----------
@@ -616,6 +685,27 @@ namespace ClassroomHud
         {
             var f = new QrForm(string.IsNullOrWhiteSpace(S.ClassTitle) ? "우리 반" : S.ClassTitle.Trim(), link, dpiK);
             f.OnRefresh = () => { QrLog("받는 중…"); PollProfiles(true); };
+            f.Show();
+            Ui.BringUp(f);
+            return f;
+        }
+
+        // 태블릿 투표 · 의견 모으기
+        Form voteForm;
+        void OpenVote()
+        {
+            if (voteForm != null && !voteForm.IsDisposed) { voteForm.Activate(); return; }
+            string why;
+            if (!Wv2.Available(out why)) { MessageBox.Show("투표 창을 열 수 없어요 (" + why + ")", "투표"); return; }
+            try { voteForm = MakeVote(); } catch (Exception ex) { Program.Log(ex); return; }
+            voteForm.FormClosed += (o, e) => { voteForm = null; st.VoteOpen = false; ver++; Render(true); };
+            st.VoteOpen = true; st.Hover = false; ver++; Render(true);
+        }
+
+        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+        Form MakeVote()
+        {
+            var f = new VoteForm(S, dpiK);
             f.Show();
             Ui.BringUp(f);
             return f;
@@ -786,6 +876,7 @@ namespace ClassroomHud
             menu.Items.Add(new ToolStripMenuItem("뽑기", null, (s, e) => OpenPicker()));
             menu.Items.Add(new ToolStripMenuItem("메모", null, (s, e) => OpenMemo()));
             menu.Items.Add(new ToolStripMenuItem("이번 주 시간표", null, (s, e) => OpenWeek()));
+            menu.Items.Add(new ToolStripMenuItem("우리 반 생일", null, (s, e) => { using (var d = new BirthdayListForm(S)) d.ShowDialog(); }));
             menu.Items.Add(new ToolStripMenuItem("위치·크기 처음으로", null, (s, e) =>
             {
                 S.X = int.MinValue; S.Scale = 1f; EnsurePosition(); S.Save(); if (!Visible) ShowFromTray(); ver++; Render(true);

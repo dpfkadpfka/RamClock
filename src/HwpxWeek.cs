@@ -55,6 +55,38 @@ namespace ClassroomHud
             finally { if (tmp != null) try { File.Delete(tmp); } catch { } }
         }
 
+        // 한글 파일의 표들 (생일 명단 등)
+        public static List<List<List<string>>> Tables(string path, out string msg)
+        {
+            msg = null; var tables = new List<List<List<string>>>();
+            string tmp = null;
+            try
+            {
+                if (Path.GetExtension(path).ToLowerInvariant() == ".hwp")
+                {
+                    tmp = HwpToHwpx(path);
+                    if (tmp == null) { msg = "옛 한글(.hwp) 파일은 한글이 설치되어 있어야 읽을 수 있어요. HWPX로 저장해서 넣어 주세요."; return tables; }
+                    path = tmp;
+                }
+                using (var fs = File.Open(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+                using (var z = new ZipArchive(fs, ZipArchiveMode.Read))
+                {
+                    var secs = new List<string>();
+                    foreach (var e in z.Entries) if (Regex.IsMatch(e.FullName, @"^Contents/section\d+\.xml$", RegexOptions.IgnoreCase)) secs.Add(e.FullName);
+                    secs.Sort();
+                    foreach (var s in secs)
+                    {
+                        var d = new XmlDocument();
+                        using (var st = z.GetEntry(s).Open()) d.Load(st);
+                        foreach (XmlElement t in d.GetElementsByTagName("*")) if (t.LocalName == "tbl") tables.Add(Grid(t));
+                    }
+                }
+            }
+            catch (Exception ex) { msg = "한글 파일을 읽지 못했어요. (" + ex.Message + ")"; }
+            finally { if (tmp != null) try { File.Delete(tmp); } catch { } }
+            return tables;
+        }
+
         static int Count(WeekParseResult r)
         {
             int n = 0;
