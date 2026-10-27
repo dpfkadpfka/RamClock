@@ -1121,34 +1121,48 @@ namespace ClassroomHud
         // ---------- 뽑기 ----------
         void BuildPick()
         {
+            // 1줄: 우리 반 기본
             var top = Flow();
+            top.Controls.Add(new Label { Text = "우리 반 이름", AutoSize = true, Margin = new Padding(3, 9, 6, 3) });
+            txtClass = new TextBox { Width = 130, Text = R.ClassTitle ?? "", Margin = new Padding(3, 5, 18, 3) };
+            new ToolTip().SetToolTip(txtClass, "예: 2학년 1반 — 학생 카드 꾸미기 화면에 나와요");
+            top.Controls.Add(txtClass);
             top.Controls.Add(new Label { Text = "학생 수", AutoSize = true, Margin = new Padding(3, 8, 6, 3) });
             nCount = new NumericUpDown { Minimum = 1, Maximum = 60, Value = Math.Max(1, Math.Min(60, R.StudentCount)), Width = 64, Margin = new Padding(3, 5, 3, 3) };
             nCount.ValueChanged += (o, e) => ResizeStudents((int)nCount.Value);
             top.Controls.Add(nCount);
-            top.Controls.Add(new Label { Text = "명", AutoSize = true, Margin = new Padding(3, 8, 24, 3) });
+            top.Controls.Add(new Label { Text = "명", AutoSize = true, Margin = new Padding(3, 8, 3, 3) });
+
+            // 2줄: 뽑기 방식
+            var how = Flow();
+            how.Controls.Add(new Label { Text = "뽑을 때 보여 줄 것", AutoSize = true, Margin = new Padding(3, 9, 6, 3) });
             rbBoth = new Chip { Text = "번호+이름", AutoSize = true, Checked = R.PickMode == 0, Margin = new Padding(3, 6, 6, 3) };
             rbName = new Chip { Text = "이름만", AutoSize = true, Checked = R.PickMode == 1, Margin = new Padding(3, 6, 6, 3) };
-            rbNo = new Chip { Text = "번호만", AutoSize = true, Checked = R.PickMode == 2, Margin = new Padding(3, 6, 24, 3) };
-            top.Controls.AddRange(new Control[] { rbBoth, rbName, rbNo });
-            chkNoRepeat = new Toggle { Text = "한 번 뽑힌 학생은 빼기", AutoSize = true, Checked = R.PickNoRepeat, Margin = new Padding(3, 6, 10, 3) };
-            top.Controls.Add(chkNoRepeat);
-            chkResetStart = new Toggle { Text = "프로그램을 켤 때마다 뽑힌 기록 지우기", AutoSize = true, Checked = R.PickResetOnStart, Margin = new Padding(3, 6, 10, 3) };
-            top.Controls.Add(chkResetStart);
-            top.Controls.Add(new Label { Text = "우리 반 이름", AutoSize = true, Margin = new Padding(3, 9, 6, 3) });
-            txtClass = new TextBox { Width = 120, Text = R.ClassTitle ?? "", Margin = new Padding(3, 5, 3, 3) };
-            new ToolTip().SetToolTip(txtClass, "예: 2학년 1반 — 학생 카드 꾸미기 화면에 나와요");
-            top.Controls.Add(txtClass);
+            rbNo = new Chip { Text = "번호만", AutoSize = true, Checked = R.PickMode == 2, Margin = new Padding(3, 6, 18, 3) };
+            how.Controls.AddRange(new Control[] { rbBoth, rbName, rbNo });
+            chkNoRepeat = new Toggle { Text = "뽑힌 학생 빼고 뽑기", AutoSize = true, Checked = R.PickNoRepeat, Margin = new Padding(3, 6, 10, 3) };
+            chkResetStart = new Toggle { Text = "켤 때마다 기록 지우기", AutoSize = true, Checked = R.PickResetOnStart, Margin = new Padding(3, 6, 10, 3) };
+            var rec = Flow();
+                        rec.Controls.Add(chkNoRepeat); rec.Controls.Add(chkResetStart);
+            lPicked = new Label { AutoSize = true, Margin = new Padding(8, 9, 6, 3), ForeColor = Color.DimGray };
+            var bReset = B("기록 지우기");
+            bReset.Click += (o, e) => { R.Picked.Clear(); UpdatePicked(); };
+            rec.Controls.Add(lPicked); rec.Controls.Add(bReset);
 
+            // 명단 표 (번호 · 이름 · 닉네임 · 성별 · 생일 · 사진)
             gStu = NewGrid();
-            gStu.Columns.Add(TextCol("번호", 10, true));
-            gStu.Columns.Add(TextCol("이름", 34));
-            gStu.Columns.Add(ComboCol("성별", 12, "—", "남", "여"));
-            gStu.Columns.Add(TextCol("프로필 사진", 26, true));
-            gStu.Columns.Add(BtnCol("사진…", 10));
-            gStu.Columns.Add(BtnCol("사진 빼기", 10));
+            gStu.Columns.Add(TextCol("번호", 8, true));
+            gStu.Columns.Add(TextCol("이름", 22));
+            gStu.Columns.Add(ComboCol("성별", 10, "—", "남", "여"));
+            gStu.Columns.Add(TextCol("사진", 22, true));
+            gStu.Columns.Add(BtnCol("사진…", 9));
+            gStu.Columns.Add(BtnCol("사진 빼기", 1));
             gStu.Columns.Add(TextCol("닉네임", 18));
             gStu.Columns.Add(TextCol("생일", 14));
+            gStu.Columns[5].Visible = false;   // 빼기는 [사진] 버튼 안으로
+            int[] order = { 0, 1, 3, 5, 6, 7, 2, 4 };
+            Action reorder = () => { try { for (int t = 0; t < order.Length; t++) gStu.Columns[Array.IndexOf(order, t)].DisplayIndex = t; } catch { } };
+            reorder(); gStu.HandleCreated += (o, e) => reorder();   // 번호·이름·닉네임·성별·생일·사진
             gStu.CellEndEdit += (o, e) =>
             {
                 if (e.RowIndex < 0 || e.ColumnIndex != 7) return;
@@ -1160,38 +1174,41 @@ namespace ClassroomHud
             ResizeStudents(R.StudentCount);
             gStu.CellContentClick += (o, e) =>
             {
-                if (e.RowIndex < 0) return;
+                if (e.RowIndex < 0 || e.ColumnIndex != 4) return;
                 var row = gStu.Rows[e.RowIndex];
-                if (e.ColumnIndex == 4)
+                Action pick = () =>
                 {
                     using (var od = new OpenFileDialog { Filter = "이미지|*.png;*.jpg;*.jpeg;*.gif;*.bmp", Title = (e.RowIndex + 1) + "번 프로필 사진" })
                         if (od.ShowDialog(this) == DialogResult.OK) { var n = Media.Import(od.FileName); if (n != null) { row.Tag = n; row.Cells[3].Value = ImageText(n); } }
-                }
-                else if (e.ColumnIndex == 5) { row.Tag = ""; row.Cells[3].Value = ImageText(""); }
+                };
+                if (string.IsNullOrEmpty(row.Tag as string)) { pick(); return; }
+                var m = new ContextMenuStrip();
+                m.Items.Add("다른 사진 고르기…", null, (a1, a2) => pick());
+                m.Items.Add("사진 빼기", null, (a1, a2) => { row.Tag = ""; row.Cells[3].Value = ImageText(""); });
+                m.Show(Cursor.Position);
             };
 
+            // 아래 버튼: 꼭 쓰는 것만 밖에, 나머지는 [명단 더 보기] 안에
             var bar = Flow();
             var bXl = B("엑셀로 명단 넣기…"); bXl.Tag = "primary";
             bXl.Click += (o, e) => ImportRoster();
-            var bTpl = B("엑셀 서식 받기…");
-            bTpl.Click += (o, e) => SaveRosterTemplate();
             var bPhotos = B("사진 한꺼번에 넣기…");
             bPhotos.Click += (o, e) => ImportPhotos();
-            var bPaste = B("붙여 넣기…");
-            bPaste.Click += (o, e) => PasteNames();
             var bBirth = B("생일 명단 넣기…");
             bBirth.Click += (o, e) => ImportBirthdays(null);
-            var bBirthList = B("생일 목록");
+            var bBirthList = B("생일 달력");
             bBirthList.Click += (o, e) => { CommitPick(); using (var d = new BirthdayListForm(R)) d.ShowDialog(this); };
-            var bClear = B("이름 모두 지우기");
-            bClear.Click += (o, e) => { foreach (DataGridViewRow r in gStu.Rows) r.Cells[1].Value = ""; };
-            lPicked = new Label { AutoSize = true, Margin = new Padding(16, 9, 6, 3), ForeColor = Color.DimGray };
-            var bReset = B("뽑힌 기록 지우기");
-            bReset.Click += (o, e) => { R.Picked.Clear(); UpdatePicked(); };
-            bar.Controls.AddRange(new Control[] { bTpl, bXl, bPhotos, bBirth, bBirthList, bPaste, bClear, lPicked, bReset });
+            var bMore = B("더 보기 ▾");
+            var more = new ContextMenuStrip();
+            more.Items.Add("엑셀 서식 받기…", null, (o, e) => SaveRosterTemplate());
+            more.Items.Add("이름 붙여 넣기…", null, (o, e) => PasteNames());
+            more.Items.Add(new ToolStripSeparator());
+            more.Items.Add("이름 모두 지우기", null, (o, e) => { foreach (DataGridViewRow r in gStu.Rows) r.Cells[1].Value = ""; });
+            bMore.Click += (o, e) => more.Show(bMore, new Point(0, bMore.Height));
+            bar.Controls.AddRange(new Control[] { bXl, bPhotos, bBirth, bBirthList, bMore });
             UpdatePicked();
-            var note = Note("[엑셀로 명단 넣기]는 나이스 명렬표처럼 번호·성명·성별 열이 있는 파일을 그대로 읽어요. 엑셀 칸에 사진을 넣어 두면 사진도 함께 들어가요. 사진 파일만 따로 있으면 [사진 한꺼번에 넣기]로 여러 장을 고르세요(파일 이름에 이름이나 번호). 이름을 비워 두면 번호로 뽑아요. 성별을 정해 두면 뽑기 창에서 [남자만]·[여자만]으로 뽑을 수 있어요. 프로필 사진을 넣으면 뽑힐 때 사진도 함께 나와요. 위젯의 [뽑기]를 누르면 시작해요.");
-            Page("뽑기 도구", new Control[] { top, gStu, bar, note }, new float[] { 0, 100, 0, 0 });
+            var note = Note("나이스 명렬표를 [엑셀로 명단 넣기]로 그대로 넣으면 번호·이름·성별(·사진·생일)이 들어가요. 생일 파일은 엑셀·한글·글 어떤 모양이든 [생일 명단 넣기]로 넣으면 알아서 찾아요.");
+            Page("뽑기 도구", new Control[] { top, how, rec, gStu, bar, note }, new float[] { 0, 0, 0, 100, 0, 0 });
         }
 
         static string GenderText(string g) { return g == "남" || g == "여" ? g : "—"; }
@@ -1203,7 +1220,7 @@ namespace ClassroomHud
             return null;
         }
 
-        void UpdatePicked() { lPicked.Text = "지금까지 뽑힌 학생 " + R.Picked.Count + "명"; }
+        void UpdatePicked() { lPicked.Text = "(" + R.Picked.Count + "명 뽑힘)"; }
 
         TextBox txtClass;
         void ResizeStudents(int n)

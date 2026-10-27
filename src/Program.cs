@@ -210,6 +210,15 @@ namespace ClassroomHud
             wf.Shown += (o, e) => t2.Start();
             Application.Run(wf);
 
+            var Sb = Sample(); var bds = new[] { "10-03", "10-15", "10-15", "10-28", "11-02", "03-05" };
+            for (int i = 0; i < bds.Length && i < Sb.Students.Count; i++) Sb.Students[i].Birthday = bds[i];
+            var bf = new BirthdayListForm(Sb) { StartPosition = FormStartPosition.Manual, Location = new Point(0, 0) };
+            var tb = new System.Windows.Forms.Timer { Interval = 900 };
+            tb.Tick += (o, e) => { tb.Stop(); Grab(bf, dir + "/bday.png"); bf.Close(); };
+            bf.Shown += (o, e) => tb.Start();
+            Application.Run(bf);
+            if (Environment.GetEnvironmentVariable("ONLYBDAY") == "1") return;
+
             var S3 = Sample(); S3.Memo = "오늘 준비물: 색연필, 가위\n5교시 강당 이동";
             var mf = new MemoForm(S3) { StartPosition = FormStartPosition.Manual, Location = new Point(0, 0) };
             var t5 = new System.Windows.Forms.Timer { Interval = 900 };

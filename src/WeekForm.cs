@@ -83,7 +83,7 @@ namespace ClassroomHud
             bPdf.Click += (o, e) => { var wp = Plan(false); var p = wp != null ? Settings.MediaPath(wp.Pdf) : null; if (p != null) try { Process.Start(p); } catch { } };
             bClear.Click += (o, e) =>
             {
-                if (MessageBox.Show(this, "이 주에 넣은 과목과 내용을 지울까요? 기본 시간표로 돌아가요.", "RamClock", MessageBoxButtons.YesNo) == DialogResult.Yes)
+                if (MessageBox.Show(this, "이 주에 넣은 과목과 내용을 지울까요? 지난번에 넣은 주간 시간표(없으면 기본 시간표)로 돌아가요.", "RamClock", MessageBoxButtons.YesNo) == DialogResult.Yes)
                 { S.WeekPlans.Remove(Key); Save(); Load2(); }
             };
             bottom.Controls.AddRange(new Control[] { bImport, bPdf, bClear, bClose });
@@ -102,8 +102,17 @@ namespace ClassroomHud
         {
             WeekPlan wp;
             if (S.WeekPlans.TryGetValue(Key, out wp) && wp != null) return wp;
-            if (!create) return null;
+            bool carried; var prev = S.PlanFor(monday, out carried);
+            if (!create) return prev;
+            // 이 주에 처음 고칠 때: 이어 쓰던 지난 주 내용을 복사해서 시작
             wp = new WeekPlan();
+            if (prev != null && prev.Days != null)
+                foreach (var kv in prev.Days)
+                {
+                    var l = new List<WeekCell>();
+                    if (kv.Value != null) foreach (var c in kv.Value) l.Add(c == null ? null : new WeekCell(c.Subj, c.Content) { Move = c.Move });
+                    wp.Days[kv.Key] = l;
+                }
             S.WeekPlans[Key] = wp;
             return wp;
         }
@@ -128,10 +137,13 @@ namespace ClassroomHud
             var fri = monday.AddDays(4);
             lTitle.Text = monday.Month + "월 " + monday.Day + "일(월) ~ " + fri.Month + "월 " + fri.Day + "일(금)";
             var wp = Plan(false);
+            WeekPlan own; bool mine = S.WeekPlans.TryGetValue(Key, out own) && own != null;
             bPdf.Enabled = wp != null && Settings.MediaPath(wp.Pdf) != null;
-            bClear.Enabled = wp != null;
+            bClear.Enabled = mine;
             lNote.Text = wp == null
                 ? "이 주는 아직 주간학습안내를 넣지 않았어요. 회색 글씨는 기본 시간표예요. [주간학습안내 불러오기]를 누르거나, PDF·한글 파일을 이 창에 끌어다 놓거나, 칸을 두 번 눌러 직접 적을 수 있어요."
+                : !mine
+                ? "이 주는 새 주간학습안내가 없어서 지난번에 넣은 시간표를 그대로 쓰고 있어요. 새로 넣거나 칸을 두 번 눌러 고치면 이 주 것으로 바뀌어요."
                 : "칸을 두 번 누르면 과목과 내용을 고칠 수 있어요. 여기 적힌 과목으로 위젯이 이 주에 교시를 안내해요.";
             grid.Rows.Clear();
             int rows = Rows();

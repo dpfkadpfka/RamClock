@@ -221,6 +221,7 @@ namespace ClassroomHud
             {
                 lastTop = now;
                 SetWindowPos(Handle, new IntPtr(-1), 0, 0, 0, 0, 0x0001 | 0x0002 | 0x0010);
+                KeepToolsAbove();
             }
             Render(false);
         }
@@ -333,11 +334,7 @@ namespace ClassroomHud
                         return;
                     }
             var b = HitBtn(e.Location);
-            if (b != null) { pressed = b; return; }
-            if (st.BannerLabel != null && comp.Banner.Contains(e.Location))
-            {
-                CloseBanner(); Audio.Stop(); Render(true); return;
-            }
+            if (b != null) { pressed = b; if (tipTimer != null) { tipTimer.Stop(); try { tip.Hide(this); } catch { } } return; }
             if (S.Locked) return;
             var before = comp.Win.Location;
             dragging = true;
@@ -385,8 +382,66 @@ namespace ClassroomHud
             if (comp != null && !S.Locked)
                 for (int i = 0; i < comp.Handles.Length; i++)
                     if (comp.Handles[i].Contains(e.Location)) hc = (i == 0 || i == 3) ? Cursors.SizeNWSE : Cursors.SizeNESW;
-            var want = hc ?? (HitBtn(e.Location) != null ? Cursors.Hand : (S.Locked ? Cursors.Default : Cursors.SizeAll));
+            var hb = HitBtn(e.Location);
+            var want = hc ?? (hb != null ? Cursors.Hand : (S.Locked ? Cursors.Default : Cursors.SizeAll));
             if (Cursor != want) Cursor = want;
+            TipHover(hb);
+        }
+
+        protected override void OnMouseLeave(EventArgs e) { base.OnMouseLeave(e); TipHover(null); }
+
+        // ---------- 버튼에 마우스를 올리면 짧은 설명 ----------
+        ToolTip tip; Timer tipTimer; string tipId, tipText;
+        void TipHover(Btn b)
+        {
+            string id = b == null ? null : b.Id;
+            if (id == tipId) return;
+            tipId = id; tipText = b == null ? null : TipOf(b);
+            if (tip == null)
+            {
+                tip = new ToolTip { UseAnimation = false, UseFading = false };
+                tipTimer = new Timer { Interval = 450 };
+                tipTimer.Tick += (o, e) =>
+                {
+                    tipTimer.Stop();
+                    if (tipText == null || pressed != null) return;
+                    var p = PointToClient(Control.MousePosition);
+                    try { tip.Show(tipText, this, p.X + 14, p.Y + 22, 3500); } catch { }
+                };
+            }
+            tipTimer.Stop();
+            try { tip.Hide(this); } catch { }
+            if (tipText != null) tipTimer.Start();
+        }
+
+        static string TipOf(Btn b)
+        {
+            string id = b.Id ?? "";
+            if (id.StartsWith("link:")) return string.IsNullOrEmpty(b.Text) ? "사이트 열기" : b.Text + " 열기";
+            if (id.StartsWith("msg:")) return "안내 띄우기: " + b.Text;
+            switch (id)
+            {
+                case "m0": return "시간표 — 오늘 수업과 남은 시간";
+                case "m1": return "타이머 — 정한 시간만큼 거꾸로 세기";
+                case "m2": return "스톱워치 — 걸린 시간 재기";
+                case "msgs": return "선생님 안내 — 미리 만든 안내를 화면에 띄우기";
+                case "pick": return "뽑기 — 학생 번호를 무작위로 뽑기";
+                case "memo": return "텍스트 — 시계 아래에 글 쓰기";
+                case "memodel": return "글 지우기";
+                case "bannerdel": return "닫기";
+                case "week": return "이번 주 — 주간 시간표 보기";
+                case "music": return "음악 — 유튜브 미니 플레이어";
+                case "noise": return "소음 신호등 — 마이크로 교실 소리 재기";
+                case "meal": return "오늘 급식 — 점심 메뉴 보기";
+                case "vote": return "투표 — 태블릿으로 투표·의견 모으기";
+                case "settings": return "설정";
+                case "pin": return "항상 위에 두기 (켜고 끄기)";
+                case "hide": return "작게 숨기기 (작업 표시줄 오른쪽 아이콘으로)";
+                case "max": return "크게 보기";
+                case "quit": return "끄기";
+                case "linkadd": return "자주 가는 사이트 추가";
+            }
+            return null;   // 글자가 그대로 보이는 버튼은 설명 없음
         }
 
         protected override void OnMouseWheel(MouseEventArgs e)
@@ -412,6 +467,11 @@ namespace ClassroomHud
                 int m; if (int.TryParse(id.Substring(3), out m)) { st.TDur = m * 60000L; st.TRemain = st.TDur; st.TRun = false; st.TDone = false; }
             }
             else if (id.StartsWith("c:")) { S.Color = id.Substring(2); st.Popup = 0; S.Save(); }
+            else if (id == "bannerdel")
+            {
+                CloseBanner(); Audio.Stop(); ver++; Render(true);
+                return;
+            }
             else if (id == "memodel")
             {
                 S.Memo = ""; S.MemoRuns = null; S.Save(); ver++; Render(true);
@@ -515,6 +575,18 @@ namespace ClassroomHud
         }
 
         // 창이 열려 있는 동안 시계를 '항상 위'에서 잠시 내림 (창을 가리지 않게)
+        // 시계를 맨 위로 다시 올릴 때, 열어 둔 투표·카드·소음 같은 창은 시계보다 위에 그대로 두기
+        void KeepToolsAbove()
+        {
+            try
+            {
+                foreach (Form f in Application.OpenForms)
+                    if (f != this && f.Visible && f.TopMost && !f.IsDisposed && f.WindowState != FormWindowState.Minimized)
+                        SetWindowPos(f.Handle, new IntPtr(-1), 0, 0, 0, 0, 0x0001 | 0x0002 | 0x0010);
+            }
+            catch { }
+        }
+
         void Lower() { try { TopMost = false; SetWindowPos(Handle, new IntPtr(-2), 0, 0, 0, 0, 0x0001 | 0x0002 | 0x0010); } catch { } }
         void Raise() { if (settingsForm != null && !settingsForm.IsDisposed) return; try { TopMost = S.TopMostOn; } catch { } }
 
@@ -560,7 +632,7 @@ namespace ClassroomHud
                         if (err != null) { if (force) ShowBanner("오늘 급식", "급식 메뉴를 받아 오지 못했어요. 인터넷 연결을 확인해 주세요.", 10); ver++; return; }
                         if (menu == null || menu.Count == 0) { if (force) ShowBanner("오늘 급식", "오늘은 급식 정보가 없어요.", 8); ver++; return; }
                         string text = string.Join("  ·  ", menu);
-                        ShowBanner("오늘 급식" + (kcal != null ? "  " + kcal : ""), text, force ? 25 : 40);
+                        ShowBanner("오늘 급식", text, force ? 0 : 40);
                         if (!force) Audio.Announce("오늘 점심은 " + string.Join(", ", menu) + "입니다. 맛있게 먹어요.", null, 1, S.Sfx, S.Voice);
                         ver++; Render(true);
                     }));
@@ -697,9 +769,10 @@ namespace ClassroomHud
             if (voteForm != null && !voteForm.IsDisposed) { voteForm.Activate(); return; }
             string why;
             if (!Wv2.Available(out why)) { MessageBox.Show("투표 창을 열 수 없어요 (" + why + ")", "투표"); return; }
-            try { voteForm = MakeVote(); } catch (Exception ex) { Program.Log(ex); return; }
+            st.VoteOpen = true; st.Hover = false; st.Popup = 0; ver++; Render(true);
+            try { voteForm = MakeVote(); } catch (Exception ex) { Program.Log(ex); st.VoteOpen = false; return; }
             voteForm.FormClosed += (o, e) => { voteForm = null; st.VoteOpen = false; ver++; Render(true); };
-            st.VoteOpen = true; st.Hover = false; ver++; Render(true);
+            var vf = voteForm; BeginInvoke(new Action(() => { if (!vf.IsDisposed) Ui.BringUp(vf); }));
         }
 
         [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]

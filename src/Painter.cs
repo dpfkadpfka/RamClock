@@ -918,6 +918,12 @@ namespace ClassroomHud
                         by += 21 * s * 1.35f;
                     }
                     comp.Banner = br;
+                    if (st.Hover)
+                    {
+                        float d = 26 * k;
+                        var bX = new Btn { Id = "bannerdel", Text = "", Round = true, R = new RectangleF(br.Right - d * 0.75f, br.Y - d * 0.25f, d, d) };
+                        DrawRoundIcon(g, bX, k); comp.Btns.Add(bX);
+                    }
                 }
 
                 // 모서리 크기 조절 손잡이
@@ -1119,10 +1125,10 @@ namespace ClassroomHud
         {
             var r = b.R;
             using (var sh = new SolidBrush(Color.FromArgb(50, 0, 0, 0))) g.FillEllipse(sh, r.X, r.Y + 1.5f * k, r.Width, r.Height);
-            using (var fb = new SolidBrush(b.Id == "memodel" ? Color.FromArgb(255, 98, 98) : Color.White)) g.FillEllipse(fb, r);
-            using (var pen = new Pen(b.Id == "memodel" ? Color.White : Line, Math.Max(1f, 1.2f * k))) g.DrawEllipse(pen, r);
+            using (var fb = new SolidBrush((b.Id == "memodel" || b.Id == "bannerdel") ? Color.FromArgb(255, 98, 98) : Color.White)) g.FillEllipse(fb, r);
+            using (var pen = new Pen((b.Id == "memodel" || b.Id == "bannerdel") ? Color.White : Line, Math.Max(1f, 1.2f * k))) g.DrawEllipse(pen, r);
             float cx = r.X + r.Width / 2, cy = r.Y + r.Height / 2, d = r.Width * 0.22f;
-            if (b.Id == "memodel")
+            if (b.Id == "memodel" || b.Id == "bannerdel")
                 using (var pen = new Pen(Color.White, 2.4f * k) { StartCap = LineCap.Round, EndCap = LineCap.Round })
                 { g.DrawLine(pen, cx - d, cy - d, cx + d, cy + d); g.DrawLine(pen, cx - d, cy + d, cx + d, cy - d); }
             else

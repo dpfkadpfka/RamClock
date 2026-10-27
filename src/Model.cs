@@ -363,11 +363,36 @@ namespace ClassroomHud
             return d.Date.AddDays(-diff).ToString("yyyy-MM-dd");
         }
 
+        static bool HasCells(WeekPlan wp)
+        {
+            if (wp == null || wp.Days == null) return false;
+            foreach (var kv in wp.Days) if (kv.Value != null) foreach (var c in kv.Value) if (c != null && !string.IsNullOrWhiteSpace(c.Subj)) return true;
+            return false;
+        }
+
+        // 그 주의 주간 시간표. 그 주에 새로 넣은 게 없으면 가장 최근에 넣은 주의 것을 그대로 씀
+        // (carried = 지난 주 것을 이어서 쓰는 중)
+        public WeekPlan PlanFor(DateTime date, out bool carried)
+        {
+            carried = false;
+            if (WeekPlans == null) return null;
+            string key = WeekKey(date);
+            WeekPlan wp;
+            if (WeekPlans.TryGetValue(key, out wp) && wp != null) return wp;
+            string best = null;
+            foreach (var kv in WeekPlans)
+                if (string.CompareOrdinal(kv.Key, key) < 0 && HasCells(kv.Value) && (best == null || string.CompareOrdinal(kv.Key, best) > 0)) best = kv.Key;
+            if (best == null) return null;
+            carried = true;
+            return WeekPlans[best];
+        }
+        public WeekPlan PlanFor(DateTime date) { bool c; return PlanFor(date, out c); }
+
         public WeekCell WeekCellOf(DateTime date, int n)
         {
-            WeekPlan wp; List<WeekCell> l;
+            WeekPlan wp = PlanFor(date); List<WeekCell> l;
             int dow = (int)date.DayOfWeek;
-            if (n >= 1 && WeekPlans.TryGetValue(WeekKey(date), out wp) && wp != null && wp.Days != null &&
+            if (n >= 1 && wp != null && wp.Days != null &&
                 wp.Days.TryGetValue(dow.ToString(), out l) && l != null && n - 1 < l.Count && l[n - 1] != null &&
                 !string.IsNullOrWhiteSpace(l[n - 1].Subj)) return l[n - 1];
             return null;
@@ -379,7 +404,8 @@ namespace ClassroomHud
         {
             int dow = (int)date.DayOfWeek;
             WeekPlan wp; List<WeekCell> l;
-            if (WeekPlans != null && WeekPlans.TryGetValue(WeekKey(date), out wp) && wp != null && wp.Days != null &&
+            wp = PlanFor(date);
+            if (wp != null && wp.Days != null &&
                 wp.Days.TryGetValue(dow.ToString(), out l) && l != null)
             {
                 int last = 0;
