@@ -137,11 +137,6 @@ namespace ClassroomHud
             {
                 if (u.No < 1 || u.No > S.StudentCount) continue;
                 var st = S.StudentOf(u.No);
-                if (st != null && !string.IsNullOrWhiteSpace(st.Name) && u.Name.Length > 0 && Norm(st.Name) != Norm(u.Name))
-                {
-                    msgs.Add(u.No + "번: 이름이 명단(" + st.Name.Trim() + ")과 달라서 받지 않았어요");
-                    continue;
-                }
                 if (st == null) { st = new Student(u.No, u.Name); S.Students.Add(st); S.Students.Sort((a, b) => a.No.CompareTo(b.No)); }
                 if (string.IsNullOrWhiteSpace(st.Name) && u.Name.Length > 0) st.Name = u.Name;
                 st.Nick = u.Nick.Length > 0 ? u.Nick : null;

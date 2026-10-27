@@ -45,7 +45,7 @@ input[type=text]:focus{outline:3px solid #c9d1ff;border-color:var(--acc)}
   <div class="box" id="s1">
     <h2>1. 내 번호를 눌러요</h2>
     <div class="nums" id="nums"></div>
-    <label for="name">내 이름</label>
+    <label for="name">내 이름 (안 써도 돼요)</label>
     <input type="text" id="name" maxlength="10" placeholder="예: 김하늘" autocomplete="off">
     <button class="btn pri" id="next" disabled>다음</button>
   </div>
@@ -84,7 +84,7 @@ input[type=text]:focus{outline:3px solid #c9d1ff;border-color:var(--acc)}
     b.onclick = function(){ no = +this.dataset.n; [].forEach.call(nums.children, function(x){ x.classList.toggle('on', +x.dataset.n === no); }); check(); };
     nums.appendChild(b);
   }
-  function check(){ $('next').disabled = !(no > 0 && $('name').value.trim().length > 0); }
+  function check(){ $('next').disabled = !(no > 0); }
   $('name').oninput = check;
   function preview(){
     var nm = $('nick').value.trim() || $('name').value.trim();
