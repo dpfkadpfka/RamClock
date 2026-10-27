@@ -92,6 +92,7 @@ namespace ClassroomHud
             else if (act == "close") { closed = true; Run("setClosed(true)"); }
             else if (act == "reopen") { closed = false; Run("setClosed(false)"); }
             else if (act == "new") { gen++; voteId = null; }
+            else if (act == "sfx") { if (S.PickSound) { if ((d["k"] as string) == "hit") Audio.PlayFanfare(); else Audio.PlayDrum(); } }
         }
 
         // 학생 답을 실시간으로 받기 (끊기면 다시 연결, 이번 투표가 시작된 뒤 것만)
@@ -187,6 +188,13 @@ input[type=text]{width:100%;height:52px;border-radius:14px;border:1px solid var(
 .hide .fl,.hide .n,.hide #wall{filter:blur(14px)}
 #closedTag{display:none;color:#c0392b;font-weight:700;font-size:20px}
 .closed #closedTag{display:inline}
+.note.roll{outline:5px solid var(--acc);transform:scale(1.06)}
+.note.done{opacity:.35}
+#pick{position:fixed;inset:0;background:rgba(20,24,48,.55);display:flex;align-items:center;justify-content:center;z-index:9}
+#pick .card{background:#fff;border-radius:28px;padding:34px 40px;width:min(80vw,900px);text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.25);animation:pop .45s ease}
+#pick .tag{display:inline-block;padding:6px 18px;border-radius:20px;color:#fff;font-weight:700;font-size:18px;background:linear-gradient(90deg,#ff9f1c,#ff5e7e)}
+#pick .txt{font-size:clamp(30px,5vw,56px);font-weight:700;margin:22px 0 26px;word-break:keep-all;line-height:1.35}
+#pick .left{color:var(--mut);font-size:16px;margin-top:12px}
 [hidden]{display:none!important}
 </style></head><body>
 <div id='setup'>
@@ -198,9 +206,10 @@ input[type=text]{width:100%;height:52px;border-radius:14px;border:1px solid var(
 </div>
 <div id='live' hidden>
 <div class='l'><div id='qr'></div><p style='margin:0;color:#68708c;text-align:center'>태블릿으로 QR을 찍어요</p>
-<div class='btns'><button class='sec' id='hideBtn'>결과 가리기</button><button class='sec' id='closeBtn'>마감</button><button class='sec' id='newBtn'>새 질문</button></div></div>
+<div class='btns'><button class='sec' id='hideBtn'>결과 가리기</button><button class='sec' id='closeBtn'>마감</button><button class='sec' id='newBtn'>새 질문</button></div><button class='pri' id='pickBtn' hidden>의견 뽑기</button></div>
 <div class='r'><h2 id='qt'></h2><div><span id='cnt'>0명 참여</span> <span id='closedTag'>· 마감했어요</span></div><div id='res'></div><div id='wall' hidden></div></div>
 </div>
+<div id='pick' hidden><div class='card'><span class='tag'>★ 뽑힌 의견 ★</span><div class='txt' id='pickTxt'></div><div class='btns' style='justify-content:center'><button class='pri' id='againBtn'>한 번 더 뽑기</button><button class='sec' id='pickClose'>닫기</button></div><div class='left' id='pickLeft'></div></div></div>
 <script>" + Res("qrcode.js") + @"
 qrcode.stringToBytes = qrcode.stringToBytesFuncs['UTF-8'];
 var mode='c', $=function(i){return document.getElementById(i);}, opts=[];
@@ -220,7 +229,7 @@ $('go').onclick=function(){
 function showVote(link,q,m,o){
   mode=m; opts=o; $('setup').hidden=true; $('live').hidden=false; $('qt').textContent=q;
   var c=qrcode(0,'M'); c.addData(link,'Byte'); c.make(); $('qr').innerHTML=c.createSvgTag({cellSize:8,margin:2,scalable:true});
-  $('res').hidden = m!=='c'; $('wall').hidden = m!=='t'; document.body.classList.remove('closed');
+  $('res').hidden = m!=='c'; $('wall').hidden = m!=='t'; $('pickBtn').hidden = m!=='t'; picked={}; document.body.classList.remove('closed');
   if(m==='c') setResults(o.map(function(){return 0;}),0); else setTexts([]);
 }
 function setResults(cnt,total){
@@ -232,12 +241,36 @@ function setTexts(list){
   $('cnt').textContent=list.length+'명 참여'; var w=$('wall');
   while(w.children.length>list.length) w.removeChild(w.lastChild);
   list.forEach(function(t,i){ if(i<w.children.length){ if(w.children[i].textContent!==t) w.children[i].textContent=t; } else { var d=document.createElement('div'); d.className='note'; d.textContent=t; w.appendChild(d); } });
+  [].forEach.call(w.children,function(n){ n.classList.toggle('done', !!picked[n.textContent]); });
 }
+// 의견 뽑기: 쪽지들 사이로 테두리가 돌다가 멈추고, 뽑힌 의견을 크게 보여 준다 (한 번 뽑힌 의견은 다음에 빼고)
+var picked={}, rolling=false;
+function doPick(){
+  if(rolling) return; var notes=[].slice.call($('wall').children); if(!notes.length) return;
+  var pool=notes.filter(function(n){ return !picked[n.textContent]; });
+  if(!pool.length){ picked={}; notes.forEach(function(n){ n.classList.remove('done'); }); pool=notes; }
+  rolling=true; $('pick').hidden=true; document.body.classList.remove('hide'); $('hideBtn').textContent='결과 가리기';
+  chrome.webview.postMessage(JSON.stringify({act:'sfx',k:'roll'}));
+  var win=pool[Math.floor(Math.random()*pool.length)], steps=14+Math.floor(Math.random()*6), i=0, cur=null;
+  (function tick(){
+    if(cur) cur.classList.remove('roll');
+    cur = i<steps ? pool[Math.floor(Math.random()*pool.length)] : win; cur.classList.add('roll');
+    if(i++<steps){ setTimeout(tick, 70+i*i*2); return; }
+    setTimeout(function(){
+      cur.classList.remove('roll'); picked[win.textContent]=1; win.classList.add('done'); rolling=false;
+      chrome.webview.postMessage(JSON.stringify({act:'sfx',k:'hit'}));
+      var left=notes.filter(function(n){ return !picked[n.textContent]; }).length;
+      $('pickTxt').textContent=win.textContent; $('pickLeft').textContent= left? '아직 안 뽑힌 의견 '+left+'개' : '모든 의견을 다 뽑았어요. 다시 누르면 처음부터 뽑아요.';
+      $('pick').hidden=false;
+    },450);
+  })();
+}
+$('pickBtn').onclick=doPick; $('againBtn').onclick=doPick; $('pickClose').onclick=function(){ $('pick').hidden=true; };
 function setClosed(c){ document.body.classList.toggle('closed',c); $('closeBtn').textContent=c?'다시 열기':'마감'; }
 function setLive(ok){}
 $('hideBtn').onclick=function(){ var h=document.body.classList.toggle('hide'); $('hideBtn').textContent=h?'결과 보이기':'결과 가리기'; };
 $('closeBtn').onclick=function(){ chrome.webview.postMessage(JSON.stringify({act: document.body.classList.contains('closed')?'reopen':'close'})); };
-$('newBtn').onclick=function(){ chrome.webview.postMessage(JSON.stringify({act:'new'})); $('live').hidden=true; $('setup').hidden=false; document.body.classList.remove('hide','closed'); };
+$('newBtn').onclick=function(){ chrome.webview.postMessage(JSON.stringify({act:'new'})); $('pick').hidden=true; $('live').hidden=true; $('setup').hidden=false; document.body.classList.remove('hide','closed'); };
 </script></body></html>";
         }
     }
