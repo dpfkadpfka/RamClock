@@ -185,7 +185,9 @@ namespace ClassroomHud
                 else
                 {
                     using (var b = new LinearGradientBrush(ph, ControlPaint.Light(tint, 0.35f), tint, 120f)) g.FillPath(b, pp);
-                    string big = S.PickMode == 2 || S.StudentOf(no) == null || string.IsNullOrWhiteSpace(S.StudentOf(no).Name) ? no.ToString() : S.StudentOf(no).Name.Trim().Substring(0, 1);
+                    var stu = S.StudentOf(no);
+                    string shown = stu == null ? "" : !string.IsNullOrWhiteSpace(stu.Nick) ? stu.Nick.Trim() : (stu.Name ?? "").Trim();
+                    string big = S.PickMode == 2 || shown.Length == 0 ? no.ToString() : shown.Substring(0, 1);
                     using (var f = PF(ph.Height * 0.42f, true))
                     using (var tb = new SolidBrush(Color.FromArgb(170, Deep(tint))))
                     {
