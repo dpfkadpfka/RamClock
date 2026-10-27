@@ -14,6 +14,9 @@ namespace ClassroomHud
     {
         public const string PageUrl = "https://dpfkadpfka.github.io/RamClock/p/";
 
+        // 받는 서버 (시험할 때만 RAMCLOCK_NTFY로 바꿈)
+        static string Server { get { var e = Environment.GetEnvironmentVariable("RAMCLOCK_NTFY"); return string.IsNullOrEmpty(e) ? "https://ntfy.sh" : e; } }
+
         public class Update { public int No; public string Name, Nick, Photo; }
 
         public static string Topic(Settings S) { return "ramclock-" + S.ClassCode; }
@@ -35,7 +38,7 @@ namespace ClassroomHud
                 try
                 {
                     ServicePointManager.SecurityProtocol |= (SecurityProtocolType)3072;
-                    string url = "https://ntfy.sh/" + topic + "/json?poll=1&since=" + (string.IsNullOrEmpty(since) ? "12h" : since);
+                    string url = Server + "/" + topic + "/json?poll=1&since=" + (string.IsNullOrEmpty(since) ? "12h" : since);
                     string body;
                     using (var wc = new WebClient()) { wc.Encoding = Encoding.UTF8; wc.Headers[HttpRequestHeader.UserAgent] = "RamClock"; body = wc.DownloadString(url); }
                     var js = new JavaScriptSerializer();
