@@ -519,11 +519,16 @@ namespace ClassroomHud
 
         void StartProfileSync()
         {
+            // 학생이 보내는 순간 바로 받기 (실시간 연결)
+            ProfileSync.Listen(() => ProfileSync.Topic(S), () => S.ProfileSince, (u, id) =>
+            {
+                try { BeginInvoke(new Action(() => ProfilesArrived(new System.Collections.Generic.List<ProfileSync.Update> { u }, id ?? S.ProfileSince))); } catch { }
+            });
             profTimer = new Timer { Interval = 15000 };
             profTimer.Tick += (o, e) =>
             {
                 bool open = (qrForm != null && !qrForm.IsDisposed) || (picker != null && !picker.IsDisposed);
-                if (!open && (DateTime.Now - lastProfPoll).TotalMinutes < 3) return;
+                if ((DateTime.Now - lastProfPoll).TotalMinutes < (open ? 1 : 5)) return;   // 실시간 연결이 놓친 게 있을 때를 위한 예비
                 PollProfiles(false);
             };
             profTimer.Start();

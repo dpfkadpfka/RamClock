@@ -46,35 +46,8 @@ namespace ClassroomHud
                     var js = new JavaScriptSerializer();
                     foreach (var line in body.Split('\n'))
                     {
-                        if (line.Trim().Length == 0) continue;
-                        Dictionary<string, object> m;
-                        try { m = js.Deserialize<Dictionary<string, object>>(line); } catch { continue; }
-                        if (!m.ContainsKey("event") || (m["event"] as string) != "message") continue;
-                        last = m["id"] as string ?? last;
-                        Dictionary<string, object> d;
-                        try { d = js.Deserialize<Dictionary<string, object>>(m.ContainsKey("message") ? m["message"] as string : "{}"); } catch { continue; }
-                        var u = new Update();
-                        try { u.No = Convert.ToInt32(d["no"]); } catch { continue; }
-                        u.Name = d.ContainsKey("name") ? (d["name"] as string ?? "").Trim() : "";
-                        u.Nick = d.ContainsKey("nick") ? (d["nick"] as string ?? "").Trim() : "";
-                        if (u.Nick.Length > 12) u.Nick = u.Nick.Substring(0, 12);
-                        if (m.ContainsKey("attachment"))
-                        {
-                            var a = m["attachment"] as Dictionary<string, object>;
-                            string aurl = a != null && a.ContainsKey("url") ? a["url"] as string : null;
-                            if (!string.IsNullOrEmpty(aurl))
-                            {
-                                try
-                                {
-                                    Directory.CreateDirectory(Settings.MediaDir);
-                                    string name = "student_" + u.No + "_" + DateTime.Now.ToString("yyyyMMddHHmmss") + ".jpg";
-                                    using (var wc = new WebClient()) { wc.Headers[HttpRequestHeader.UserAgent] = "RamClock"; wc.DownloadFile(aurl, Path.Combine(Settings.MediaDir, name)); }
-                                    u.Photo = name;
-                                }
-                                catch (Exception ex) { Program.Log(ex); LastError = "사진을 받지 못했어요 (" + ex.Message + ")"; }
-                            }
-                        }
-                        list.Add(u);
+                        var u = ParseLine(line, js, ref last);
+                        if (u != null) list.Add(u);
                     }
                 }
                 catch (Exception ex) { Program.Log(ex); LastError = "카드를 받아 오지 못했어요 — 이 컴퓨터에서 ntfy.sh 접속이 막혀 있을 수 있어요 (" + ex.Message + ")"; }
@@ -82,6 +55,75 @@ namespace ClassroomHud
                 try { done(list, last); } catch { }
             }) { IsBackground = true };
             t.Start();
+        }
+
+        // 한 줄(메시지 하나)을 읽어 카드로 — 사진이 있으면 받아서 저장
+        static Update ParseLine(string line, JavaScriptSerializer js, ref string last)
+        {
+            if (string.IsNullOrWhiteSpace(line)) return null;
+            Dictionary<string, object> m;
+            try { m = js.Deserialize<Dictionary<string, object>>(line); } catch { return null; }
+            if (m == null || !m.ContainsKey("event") || (m["event"] as string) != "message") return null;
+            last = m["id"] as string ?? last;
+            Dictionary<string, object> d;
+            try { d = js.Deserialize<Dictionary<string, object>>(m.ContainsKey("message") ? m["message"] as string : "{}"); } catch { return null; }
+            var u = new Update();
+            try { u.No = Convert.ToInt32(d["no"]); } catch { return null; }
+            u.Name = d.ContainsKey("name") ? (d["name"] as string ?? "").Trim() : "";
+            u.Nick = d.ContainsKey("nick") ? (d["nick"] as string ?? "").Trim() : "";
+            if (u.Nick.Length > 12) u.Nick = u.Nick.Substring(0, 12);
+            if (m.ContainsKey("attachment"))
+            {
+                var a = m["attachment"] as Dictionary<string, object>;
+                string aurl = a != null && a.ContainsKey("url") ? a["url"] as string : null;
+                if (!string.IsNullOrEmpty(aurl))
+                {
+                    try
+                    {
+                        Directory.CreateDirectory(Settings.MediaDir);
+                        string name = "student_" + u.No + "_" + DateTime.Now.ToString("yyyyMMddHHmmssfff") + ".jpg";
+                        using (var wc = new WebClient()) { wc.Headers[HttpRequestHeader.UserAgent] = "RamClock"; wc.DownloadFile(aurl, Path.Combine(Settings.MediaDir, name)); }
+                        u.Photo = name;
+                    }
+                    catch (Exception ex) { Program.Log(ex); LastError = "사진을 받지 못했어요 (" + ex.Message + ")"; }
+                }
+            }
+            return u;
+        }
+
+        // 바로 반영: 서버와 연결을 열어 두고, 학생이 보내는 순간 받기 (끊기면 알아서 다시 연결)
+        static Thread listener;
+        public static void Listen(Func<string> topic, Func<string> since, Action<Update, string> onCard)
+        {
+            if (listener != null) return;
+            listener = new Thread(() =>
+            {
+                var js = new JavaScriptSerializer();
+                while (true)
+                {
+                    try
+                    {
+                        ServicePointManager.SecurityProtocol |= (SecurityProtocolType)3072;
+                        string sc = since();
+                        var req = (HttpWebRequest)WebRequest.Create(Server + "/" + topic() + "/json" + (string.IsNullOrEmpty(sc) ? "" : "?since=" + sc));
+                        req.UserAgent = "RamClock"; req.Timeout = 30000; req.ReadWriteTimeout = 120000;   // 서버가 45초마다 살아 있다는 신호를 보냄
+                        using (var resp = req.GetResponse())
+                        using (var rd = new StreamReader(resp.GetResponseStream(), Encoding.UTF8))
+                        {
+                            string line;
+                            while ((line = rd.ReadLine()) != null)
+                            {
+                                string last = null;
+                                var u = ParseLine(line, js, ref last);
+                                if (u != null) try { onCard(u, last); } catch { }
+                            }
+                        }
+                    }
+                    catch (Exception ex) { LastError = "실시간 연결이 끊겨 다시 잇는 중이에요 (" + ex.Message + ")"; }
+                    Thread.Sleep(5000);
+                }
+            }) { IsBackground = true };
+            listener.Start();
         }
 
         static string Norm(string s) { return (s ?? "").Replace(" ", "").Trim(); }
