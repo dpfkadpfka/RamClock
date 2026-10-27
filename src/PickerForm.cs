@@ -94,7 +94,7 @@ namespace ClassroomHud
 
         public void ShowWithBackdrop() { Show(); Activate(); }
         public void DrawNow() { Act("draw"); }
-        public Action OpenQr;                 // 학생 카드 꾸미기 QR 창 열기
+        public Action OpenQr, OnRefresh;      // OnRefresh: 학생 카드 새로 받기                 // 학생 카드 꾸미기 QR 창 열기
         public void RefreshCards() { try { Layout2(); if (phase == 2) MakeBigCard(); Invalidate(); } catch { } }
 
         protected override void OnShown(EventArgs e) { base.OnShown(e); Layout2(); Invalidate(); Ui.BringUp(this); }
@@ -591,7 +591,7 @@ namespace ClassroomHud
             {
                 need = 0;
                 foreach (var b in list) need += Math.Max(g.MeasureString(b.Text, f0).Width + 70 * k, b.Primary ? 220 * k : 0);
-                need += 18 * k * 2 + 2 * (3 * 76 * k + 28 * k + 40 * k);
+                need += 18 * k * 2 + 2 * (4 * 76 * k + 42 * k + 40 * k);
             }
             bs = Math.Max(0.45f, Math.Min(1f, ClientSize.Width / need));
             float bh = 64 * k * bs, y = ClientSize.Height - BottomH + (BottomH - bh) / 2, gap = 18 * k * bs;
@@ -629,7 +629,8 @@ namespace ClassroomHud
             float d = 76 * k * bs, rx = ClientSize.Width - 24 * k * bs - d;
             var right = new[] { new PBtn { Id = "sound", Text = S.PickSound ? "소리\n켬" : "소리\n끔", Round = true, On = S.PickSound },
                                 new PBtn { Id = "effect", Text = "추첨\n효과", Round = true, On = S.PickEffect },
-                                new PBtn { Id = "qr", Text = "카드\n꾸미기", Round = true, On = false } };
+                                new PBtn { Id = "qr", Text = "카드\n꾸미기", Round = true, On = false },
+                                new PBtn { Id = "refresh", Text = "새로\n받기", Round = true, On = false } };
             using (var f = PF(15 * k * bs, true))
                 foreach (var b in right)
                 {
@@ -758,6 +759,7 @@ namespace ClassroomHud
                 case "effect": S.PickEffect = !S.PickEffect; if (save != null) save(); break;
                 case "sound": S.PickSound = !S.PickSound; if (save != null) save(); break;
                 case "qr": if (OpenQr != null) OpenQr(); break;
+                case "refresh": if (OnRefresh != null) OnRefresh(); break;
             }
             Invalidate();
         }

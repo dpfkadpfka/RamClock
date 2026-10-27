@@ -1403,6 +1403,16 @@ namespace ClassroomHud
         List<CheckBox> toolChecks;
         Action showWeek;
         public void ShowWeekSubTab() { if (showWeek != null) showWeek(); }
+        // 설정 창이 열려 있는 동안 학생이 보낸 카드도 놓치지 않게: 표에 바로 반영
+        public void ApplyProfiles(List<ProfileSync.Update> list)
+        {
+            if (gStu == null) return;
+            CommitPick();
+            ProfileSync.Apply(R, list);
+            gStu.Rows.Clear();
+            ResizeStudents((int)nCount.Value);
+        }
+
         public void AddLinkRow(QuickLink l) { if (gLinks == null || l == null) return; int i = gLinks.Rows.Add(l.Name, l.Url); gLinks.CurrentCell = gLinks.Rows[i].Cells[0]; }
 
         void CommitLinks()

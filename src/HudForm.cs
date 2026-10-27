@@ -505,6 +505,8 @@ namespace ClassroomHud
             var f = new PickerForm(S, () => S.Save(), dpiK, scr);
             picker = f;
             f.OpenQr = OpenQr;
+            f.OnRefresh = () => PollProfiles(true);
+            BeginInvoke(new Action(() => PollProfiles(false)));   // 뽑기 창을 열면 바로 한 번 받기
             f.FormClosed += (o, e) => { toolOpen = false; picker = null; Raise(); BeginInvoke(new Action(() => f.Dispose())); };
             f.ShowWithBackdrop();
         }
@@ -520,15 +522,35 @@ namespace ClassroomHud
             profTimer = new Timer { Interval = 15000 };
             profTimer.Tick += (o, e) =>
             {
-                bool qrOpen = qrForm != null && !qrForm.IsDisposed;
-                if (!qrOpen && (DateTime.Now - lastProfPoll).TotalMinutes < 5) return;
-                lastProfPoll = DateTime.Now;
-                ProfileSync.Poll(ProfileSync.Topic(S), S.ProfileSince, (list, last) =>
-                {
-                    try { BeginInvoke(new Action(() => ProfilesArrived(list, last))); } catch { }
-                });
+                bool open = (qrForm != null && !qrForm.IsDisposed) || (picker != null && !picker.IsDisposed);
+                if (!open && (DateTime.Now - lastProfPoll).TotalMinutes < 3) return;
+                PollProfiles(false);
             };
             profTimer.Start();
+        }
+
+        // force: 지난 12시간 동안 온 카드를 처음부터 다시 받기 ([새로 받기] 버튼)
+        void PollProfiles(bool force)
+        {
+            lastProfPoll = DateTime.Now;
+            ProfileSync.Poll(ProfileSync.Topic(S), force ? null : S.ProfileSince, (list, last) =>
+            {
+                try
+                {
+                    BeginInvoke(new Action(() =>
+                    {
+                        ProfilesArrived(list, last);
+                        string err = ProfileSync.LastError;
+                        if (err != null) { QrLog(err); if (force && (qrForm == null || qrForm.IsDisposed)) tray.ShowBalloonTip(8000, "학생 카드", err, ToolTipIcon.Warning); }
+                        else if (force)
+                        {
+                            if (list.Count == 0) QrLog("새로 온 카드가 없어요");
+                            if (qrForm == null || qrForm.IsDisposed) tray.ShowBalloonTip(4000, "학생 카드", list.Count == 0 ? "새로 온 카드가 없어요" : list.Count + "개를 받았어요", ToolTipIcon.Info);
+                        }
+                    }));
+                }
+                catch { }
+            });
         }
 
         void ProfilesArrived(System.Collections.Generic.List<ProfileSync.Update> list, string last)
@@ -537,6 +559,7 @@ namespace ClassroomHud
             if (list.Count == 0) return;
             var msgs = ProfileSync.Apply(S, list);
             S.Save();
+            if (settingsForm != null && !settingsForm.IsDisposed) try { settingsForm.ApplyProfiles(list); } catch (Exception ex) { Program.Log(ex); }
             if (picker != null && !picker.IsDisposed) picker.RefreshCards();
             foreach (var m in msgs) QrLog(m);
             if (qrForm == null || qrForm.IsDisposed) tray.ShowBalloonTip(5000, "학생 카드", string.Join("\n", msgs), ToolTipIcon.Info);
@@ -566,6 +589,7 @@ namespace ClassroomHud
         Form MakeQr(string link)
         {
             var f = new QrForm(string.IsNullOrWhiteSpace(S.ClassTitle) ? "우리 반" : S.ClassTitle.Trim(), link, dpiK);
+            f.OnRefresh = () => { QrLog("받는 중…"); PollProfiles(true); };
             f.Show();
             Ui.BringUp(f);
             return f;

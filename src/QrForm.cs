@@ -12,6 +12,7 @@ namespace ClassroomHud
     {
         readonly WebView2 web;
         bool ready;
+        public Action OnRefresh;
         readonly System.Collections.Generic.List<string> pending = new System.Collections.Generic.List<string>();
 
         public QrForm(string title, string link, float k)
@@ -49,11 +50,13 @@ p{margin:0;color:var(--mut);font-size:16px;text-align:center;line-height:1.5}
 .u{font-size:12px;color:var(--mut);word-break:break-all;text-align:center;max-width:94%;user-select:all}
 #log{width:100%;max-height:22vh;overflow:auto;font-size:15px;border-top:1px solid #e3e6f2;padding-top:8px}
 #log div{padding:3px 0}#log .no{color:#c0392b}
+#rf{font:inherit;font-size:17px;font-weight:700;border:0;border-radius:22px;padding:10px 22px;color:#fff;background:linear-gradient(90deg,#4c63ff,#a05cff);cursor:pointer}
 </style></head><body><div class='w'>
 <h1>" + Esc(title) + @" 내 카드 만들기</h1>
 <p>태블릿 카메라로 QR을 찍고, 내 번호와 이름을 넣은 뒤<br>사진과 닉네임을 정해 [보내기]를 눌러요.</p>
 <div id='q'></div>
 <div class='u'>" + Esc(link) + @"</div>
+<button id='rf' onclick=""chrome.webview.postMessage('refresh')"">↻ 새로 받기</button>
 <div id='log'><p>학생이 보내면 여기에 바로 떠요.</p></div>
 </div><script>" + js + @"
 qrcode.stringToBytes = qrcode.stringToBytesFuncs['UTF-8'];
@@ -71,6 +74,7 @@ function addLog(t, bad){ var l=document.getElementById('log'); if(l.firstChild &
                 var env = await CoreWebView2Environment.CreateAsync(null, Wv2.DataDir, null);
                 await web.EnsureCoreWebView2Async(env);
                 web.CoreWebView2.Settings.AreDevToolsEnabled = false;
+                web.CoreWebView2.WebMessageReceived += (o, e) => { try { if (e.TryGetWebMessageAsString() == "refresh" && OnRefresh != null) OnRefresh(); } catch { } };
                 web.CoreWebView2.NavigationCompleted += (o, e) => { ready = true; foreach (var p in pending) Run(p); pending.Clear(); };
                 web.CoreWebView2.NavigateToString(html);
             }

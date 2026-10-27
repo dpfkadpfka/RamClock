@@ -27,6 +27,7 @@ namespace ClassroomHud
         }
 
         static int busy;
+        public static string LastError;   // 마지막으로 받기에 실패한 이유 (없으면 null)
 
         // 새로 온 카드들을 받아 done(목록)으로 넘김 (백그라운드)
         public static void Poll(string topic, string since, Action<List<Update>, string> done)
@@ -35,6 +36,7 @@ namespace ClassroomHud
             var t = new Thread(() =>
             {
                 var list = new List<Update>(); string last = since;
+                LastError = null;
                 try
                 {
                     ServicePointManager.SecurityProtocol |= (SecurityProtocolType)3072;
@@ -69,13 +71,13 @@ namespace ClassroomHud
                                     using (var wc = new WebClient()) { wc.Headers[HttpRequestHeader.UserAgent] = "RamClock"; wc.DownloadFile(aurl, Path.Combine(Settings.MediaDir, name)); }
                                     u.Photo = name;
                                 }
-                                catch (Exception ex) { Program.Log(ex); }
+                                catch (Exception ex) { Program.Log(ex); LastError = "사진을 받지 못했어요 (" + ex.Message + ")"; }
                             }
                         }
                         list.Add(u);
                     }
                 }
-                catch (Exception ex) { Program.Log(ex); }
+                catch (Exception ex) { Program.Log(ex); LastError = "카드를 받아 오지 못했어요 — 이 컴퓨터에서 ntfy.sh 접속이 막혀 있을 수 있어요 (" + ex.Message + ")"; }
                 finally { Interlocked.Exchange(ref busy, 0); }
                 try { done(list, last); } catch { }
             }) { IsBackground = true };
