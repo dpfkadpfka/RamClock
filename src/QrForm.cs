@@ -20,7 +20,7 @@ namespace ClassroomHud
             Text = "학생 카드 꾸미기";
             StartPosition = FormStartPosition.CenterScreen;
             TopMost = true;
-            ClientSize = new Size((int)(560 * k), (int)(720 * k));
+            ClientSize = new Size((int)(1200 * k), (int)(720 * k));
             MinimumSize = new Size((int)(360 * k), (int)(460 * k));
             BackColor = Color.White;
             try { Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath); } catch { }
@@ -41,28 +41,64 @@ namespace ClassroomHud
         {
             string js = Res("qrcode.js");
             return @"<!doctype html><html><head><meta charset='utf-8'><style>
-:root{--ink:#1c223a;--mut:#68708c;--acc:#4c63ff}
-html,body{margin:0;height:100%;font-family:'Malgun Gothic',sans-serif;color:var(--ink);background:#fff}
-.w{height:100%;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding:22px 20px;box-sizing:border-box;gap:10px}
-h1{margin:0;font-size:30px;text-align:center}
-p{margin:0;color:var(--mut);font-size:16px;text-align:center;line-height:1.5}
-#q{width:min(78vw,62vh);aspect-ratio:1}#q svg{width:100%;height:100%}
-.u{font-size:12px;color:var(--mut);word-break:break-all;text-align:center;max-width:94%;user-select:all}
-#log{width:100%;max-height:22vh;overflow:auto;font-size:15px;border-top:1px solid #e3e6f2;padding-top:8px}
-#log div{padding:3px 0}#log .no{color:#c0392b}
-#rf{font:inherit;font-size:17px;font-weight:700;border:0;border-radius:22px;padding:10px 22px;color:#fff;background:linear-gradient(90deg,#4c63ff,#a05cff);cursor:pointer}
+:root{--ink:#1c223a;--mut:#68708c;--acc:#4c63ff;--acc2:#a05cff;--line:#e3e6f2;--bg:#f6f7ff}
+html,body{margin:0;height:100%;font-family:'Malgun Gothic',sans-serif;color:var(--ink);background:var(--bg)}
+.w{height:100%;display:flex;gap:22px;padding:18px 22px;box-sizing:border-box}
+.l{flex:0 0 auto;width:min(30vw,56vh);display:flex;flex-direction:column;align-items:center;gap:8px;background:#fff;border-radius:22px;padding:16px;box-sizing:border-box}
+.r{flex:1;min-width:0;display:flex;flex-direction:column;gap:10px}
+h1{margin:0;font-size:26px;text-align:center}
+p{margin:0;color:var(--mut);font-size:16px;text-align:center;line-height:1.45}
+#q{width:100%;aspect-ratio:1}#q svg{width:100%;height:100%}
+.u{font-size:11px;color:var(--mut);word-break:break-all;text-align:center;user-select:all}
+#rf{font:inherit;font-size:16px;font-weight:700;border:0;border-radius:20px;padding:9px 20px;color:#fff;background:linear-gradient(90deg,var(--acc),var(--acc2));cursor:pointer}
+.top{display:flex;align-items:baseline;gap:14px}
+h2{margin:0;font-size:26px}
+#cnt{color:var(--mut);font-size:18px}
+#news{font-size:28px;font-weight:700;color:var(--acc);min-height:38px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#news.no{color:#c0392b}
+#g{flex:1;overflow:auto;display:grid;grid-template-columns:repeat(auto-fill,minmax(118px,1fr));gap:12px;align-content:start;padding:4px}
+.c{background:#fff;border-radius:16px;padding:8px;box-shadow:0 2px 8px rgba(40,50,120,.08);display:flex;flex-direction:column;gap:6px;transition:transform .3s}
+.c .ph{aspect-ratio:1;border-radius:12px;overflow:hidden;display:grid;place-items:center;font-size:40px;font-weight:700;color:rgba(0,0,0,.35)}
+.c .ph img{width:100%;height:100%;object-fit:cover}
+.c .nm{font-size:16px;font-weight:700;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.c .nm b{color:var(--acc);margin-right:4px}
+.c.empty{opacity:.45}
+.c.hl{outline:4px solid var(--acc);animation:pop .6s ease}
+@keyframes pop{0%{transform:scale(.8)}60%{transform:scale(1.08)}100%{transform:scale(1)}}
+@media (max-aspect-ratio:1/1){.w{flex-direction:column}.l{width:100%;flex-direction:row;flex-wrap:wrap;justify-content:center}#q{width:34vh}}
 </style></head><body><div class='w'>
+<div class='l'>
 <h1>" + Esc(title) + @" 내 카드 만들기</h1>
-<p>태블릿 카메라로 QR을 찍고, 내 번호와 이름을 넣은 뒤<br>사진과 닉네임을 정해 [보내기]를 눌러요.</p>
+<p>QR을 찍고 내 번호를 누른 뒤<br>사진과 닉네임을 정해 [보내기]!</p>
 <div id='q'></div>
 <div class='u'>" + Esc(link) + @"</div>
 <button id='rf' onclick=""chrome.webview.postMessage('refresh')"">↻ 새로 받기</button>
-<div id='log'><p>학생이 보내면 여기에 바로 떠요.</p></div>
+</div>
+<div class='r'>
+<div class='top'><h2>우리 반 카드</h2><span id='cnt'></span></div>
+<div id='news'></div>
+<div id='g'></div>
+</div>
 </div><script>" + js + @"
 qrcode.stringToBytes = qrcode.stringToBytesFuncs['UTF-8'];
 var q = qrcode(0, 'M'); q.addData(" + new System.Web.Script.Serialization.JavaScriptSerializer().Serialize(link) + @", 'Byte'); q.make();
 document.getElementById('q').innerHTML = q.createSvgTag({cellSize: 8, margin: 2, scalable: true});
-function addLog(t, bad){ var l=document.getElementById('log'); if(l.firstChild && l.firstChild.tagName==='P') l.innerHTML=''; var d=document.createElement('div'); d.textContent=t; if(bad) d.className='no'; l.insertBefore(d, l.firstChild); }
+var colors=['#ffe3a3','#ffd0e0','#cdf3dc','#d3e8ff','#e6dcff','#ffe0c4','#d9f3f1','#f3e3d3'];
+function setCards(list, hl){
+  var g=document.getElementById('g'); g.innerHTML=''; var done=0;
+  list.forEach(function(c){
+    var d=document.createElement('div'); d.className='c'+(c.photo||c.nick?'':' empty')+(hl&&hl.indexOf(c.no)>=0?' hl':'');
+    var ph=document.createElement('div'); ph.className='ph'; ph.style.background=colors[(c.no-1)%colors.length];
+    if(c.photo){ var im=document.createElement('img'); im.src='https://ramclock.media/'+encodeURIComponent(c.photo); ph.appendChild(im); }
+    else ph.textContent=(c.label||'').charAt(0)||c.no;
+    var nm=document.createElement('div'); nm.className='nm'; var b=document.createElement('b'); b.textContent=c.no; nm.appendChild(b); nm.appendChild(document.createTextNode(c.label||''));
+    d.appendChild(ph); d.appendChild(nm); g.appendChild(d);
+    if(c.photo||c.nick) done++;
+    if(hl&&hl.indexOf(c.no)>=0) setTimeout(function(){ d.scrollIntoView({block:'nearest',behavior:'smooth'}); },50);
+  });
+  document.getElementById('cnt').textContent=done+' / '+list.length+'명 완성';
+}
+function addLog(t, bad){ var n=document.getElementById('news'); n.textContent=t; n.className=bad?'no':''; }
 </script></body></html>";
         }
 
@@ -76,12 +112,24 @@ function addLog(t, bad){ var l=document.getElementById('log'); if(l.firstChild &
                 web.CoreWebView2.Settings.AreDevToolsEnabled = false;
                 web.CoreWebView2.WebMessageReceived += (o, e) => { try { if (e.TryGetWebMessageAsString() == "refresh" && OnRefresh != null) OnRefresh(); } catch { } };
                 web.CoreWebView2.NavigationCompleted += (o, e) => { ready = true; foreach (var p in pending) Run(p); pending.Clear(); };
-                web.CoreWebView2.NavigateToString(html);
+                // 학생 사진 폴더를 페이지에서 볼 수 있게
+                Directory.CreateDirectory(Settings.MediaDir);
+                web.CoreWebView2.SetVirtualHostNameToFolderMapping("ramclock.media", Settings.MediaDir, CoreWebView2HostResourceAccessKind.Allow);
+                string dir = Path.Combine(Wv2.DataDir, "page"); Directory.CreateDirectory(dir);
+                File.WriteAllText(Path.Combine(dir, "qr.html"), html, System.Text.Encoding.UTF8);
+                web.CoreWebView2.SetVirtualHostNameToFolderMapping("ramclock.app", dir, CoreWebView2HostResourceAccessKind.Allow);
+                web.CoreWebView2.Navigate("https://ramclock.app/qr.html");
             }
             catch (Exception ex) { Program.Log(ex); }
         }
 
         void Run(string js) { try { web.CoreWebView2.ExecuteScriptAsync(js); } catch { } }
+
+        public void SetCards(string json, string hlJson)
+        {
+            string js = "setCards(" + json + "," + (hlJson ?? "[]") + ")";
+            if (ready) Run(js); else pending.Add(js);
+        }
 
         public void AddLog(string text)
         {

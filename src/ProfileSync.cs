@@ -141,7 +141,7 @@ namespace ClassroomHud
                 if (string.IsNullOrWhiteSpace(st.Name) && u.Name.Length > 0) st.Name = u.Name;
                 st.Nick = u.Nick.Length > 0 ? u.Nick : null;
                 if (u.Photo != null) st.Photo = u.Photo;
-                msgs.Add(u.No + "번 " + (st.Nick ?? st.Name ?? "") + " 카드가 바뀌었어요" + (u.Photo != null ? " (사진 포함)" : ""));
+                msgs.Add(u.No + "번 " + (st.Nick ?? st.Name ?? "") + " 카드 완성!");
             }
             return msgs;
         }

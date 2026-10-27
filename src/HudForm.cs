@@ -567,11 +567,31 @@ namespace ClassroomHud
             if (settingsForm != null && !settingsForm.IsDisposed) try { settingsForm.ApplyProfiles(list); } catch (Exception ex) { Program.Log(ex); }
             if (picker != null && !picker.IsDisposed) picker.RefreshCards();
             foreach (var m in msgs) QrLog(m);
+            var hl = new System.Collections.Generic.List<int>(); foreach (var u in list) hl.Add(u.No);
+            QrCards(hl);
             if (qrForm == null || qrForm.IsDisposed) tray.ShowBalloonTip(5000, "학생 카드", string.Join("\n", msgs), ToolTipIcon.Info);
         }
 
         [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
         void QrLogCore(string m) { ((QrForm)qrForm).AddLog(m); }
+        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+        void QrCardsCore(string json, string hl) { ((QrForm)qrForm).SetCards(json, hl); }
+        // 갤러리: 우리 반 카드 전체 (사진·닉네임)
+        void QrCards(System.Collections.Generic.List<int> hl)
+        {
+            if (qrForm == null || qrForm.IsDisposed) return;
+            var rows = new System.Collections.Generic.List<object>();
+            for (int no = 1; no <= S.StudentCount; no++)
+            {
+                var st = S.StudentOf(no);
+                string nick = st != null && !string.IsNullOrWhiteSpace(st.Nick) ? st.Nick.Trim() : null;
+                string label = nick ?? (st != null ? (st.Name ?? "").Trim() : "");
+                string photo = st != null && Settings.MediaPath(st.Photo) != null ? st.Photo : null;
+                rows.Add(new System.Collections.Generic.Dictionary<string, object> { { "no", no }, { "label", label }, { "nick", nick }, { "photo", photo } });
+            }
+            var js = new System.Web.Script.Serialization.JavaScriptSerializer();
+            try { QrCardsCore(js.Serialize(rows), js.Serialize(hl ?? new System.Collections.Generic.List<int>())); } catch { }
+        }
         void QrLog(string m) { if (qrForm != null && !qrForm.IsDisposed) try { QrLogCore(m); } catch { } }
 
         void OpenQr()
@@ -587,6 +607,7 @@ namespace ClassroomHud
                 return;
             }
             try { qrForm = MakeQr(link); } catch (Exception ex) { Program.Log(ex); return; }
+            QrCards(null);
             lastProfPoll = DateTime.MinValue;   // 바로 한 번 확인
         }
 
