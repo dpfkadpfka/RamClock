@@ -23,19 +23,14 @@ jobs:
           V=$(grep -oP 'public const string Version = "\K[^"]+' src/Updater.cs)
           echo "v=$V" >> "$GITHUB_OUTPUT"
           if gh release view "v$V" >/dev/null 2>&1; then echo "new=no" >> "$GITHUB_OUTPUT"; else echo "new=yes" >> "$GITHUB_OUTPUT"; fi
-      - name: mono 설치
+      - name: 빌드 (mono 도커 이미지 — 설치 서버가 멈춰도 상관없게)
         if: steps.ver.outputs.new == 'yes'
-        timeout-minutes: 15
         run: |
-          # 가끔 설치 서버가 멈춰서: 4분 넘으면 다시 시도
           for i in 1 2 3; do
-            if timeout 240 bash -c 'sudo apt-get update -q && sudo apt-get install -y -q --no-install-recommends mono-devel'; then exit 0; fi
-            echo "다시 시도 $i"; sleep 5
+            if docker run --rm -v "$PWD:/w" -w /w mono:6.12 bash ./build.sh; then exit 0; fi
+            echo "다시 시도 $i"; sleep 10
           done
           exit 1
-      - name: 빌드
-        if: steps.ver.outputs.new == 'yes'
-        run: ./build.sh
       - name: 릴리스에 올리기
         if: steps.ver.outputs.new == 'yes'
         env:
