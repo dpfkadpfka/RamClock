@@ -12,7 +12,7 @@ namespace ClassroomHud
     {
         readonly WebView2 web;
         bool ready;
-        public Action OnRefresh;
+        public Action OnRefresh; public Action<int> OnDelete;
         readonly System.Collections.Generic.List<string> pending = new System.Collections.Generic.List<string>();
 
         public QrForm(string title, string link, float k)
@@ -62,6 +62,7 @@ h2{margin:0;font-size:26px}
 .c .ph img{width:100%;height:100%;object-fit:cover}
 .c .nm{font-size:16px;font-weight:700;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .c .nm b{color:var(--acc);margin-right:4px}
+.c{position:relative}.c .x{position:absolute;top:2px;right:2px;width:26px;height:26px;border:0;border-radius:50%;background:#ff6262;color:#fff;font-size:16px;font-weight:700;line-height:26px;padding:0;cursor:pointer;display:none;box-shadow:0 1px 4px rgba(0,0,0,.25)}.c:hover .x{display:block}
 .c.empty{opacity:.45}
 .c.hl{outline:4px solid var(--acc);animation:pop .6s ease}
 @keyframes pop{0%{transform:scale(.8)}60%{transform:scale(1.08)}100%{transform:scale(1)}}
@@ -92,7 +93,9 @@ function setCards(list, hl){
     if(c.photo){ var im=document.createElement('img'); im.src='https://ramclock.media/'+encodeURIComponent(c.photo); ph.appendChild(im); }
     else ph.textContent=(c.label||'').charAt(0)||c.no;
     var nm=document.createElement('div'); nm.className='nm'; var b=document.createElement('b'); b.textContent=c.no; nm.appendChild(b); nm.appendChild(document.createTextNode(c.label||''));
-    d.appendChild(ph); d.appendChild(nm); g.appendChild(d);
+    d.appendChild(ph); d.appendChild(nm);
+    if(c.photo||c.nick){ var x=document.createElement('button'); x.className='x'; x.textContent='×'; x.title='이 카드 지우기'; (function(no){ x.onclick=function(ev){ ev.stopPropagation(); chrome.webview.postMessage('del:'+no); }; })(c.no); d.appendChild(x); }
+    g.appendChild(d);
     if(c.photo||c.nick) done++;
     if(hl&&hl.indexOf(c.no)>=0) setTimeout(function(){ d.scrollIntoView({block:'nearest',behavior:'smooth'}); },50);
   });
@@ -110,7 +113,19 @@ function addLog(t, bad){ var n=document.getElementById('news'); n.textContent=t;
                 var env = await CoreWebView2Environment.CreateAsync(null, Wv2.DataDir, null);
                 await web.EnsureCoreWebView2Async(env);
                 web.CoreWebView2.Settings.AreDevToolsEnabled = false;
-                web.CoreWebView2.WebMessageReceived += (o, e) => { try { if (e.TryGetWebMessageAsString() == "refresh" && OnRefresh != null) OnRefresh(); } catch { } };
+                web.CoreWebView2.WebMessageReceived += (o, e) =>
+                {
+                    try
+                    {
+                        string m = e.TryGetWebMessageAsString(); int no;
+                        if (m == "refresh" && OnRefresh != null) OnRefresh();
+                        else if (m != null && m.StartsWith("del:") && int.TryParse(m.Substring(4), out no) && OnDelete != null)
+                        {
+                            if (MessageBox.Show(this, no + "번 카드(사진·닉네임)를 지울까요?", "학생 카드", MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes) OnDelete(no);
+                        }
+                    }
+                    catch { }
+                };
                 web.CoreWebView2.NavigationCompleted += (o, e) => { ready = true; foreach (var p in pending) Run(p); pending.Clear(); };
                 // 학생 사진 폴더를 페이지에서 볼 수 있게
                 Directory.CreateDirectory(Settings.MediaDir);

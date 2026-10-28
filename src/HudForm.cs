@@ -757,6 +757,7 @@ namespace ClassroomHud
         {
             var f = new QrForm(string.IsNullOrWhiteSpace(S.ClassTitle) ? "우리 반" : S.ClassTitle.Trim(), link, dpiK);
             f.OnRefresh = () => { QrLog("받는 중…"); PollProfiles(true); };
+            f.OnDelete = no => ProfilesArrived(new System.Collections.Generic.List<ProfileSync.Update> { new ProfileSync.Update { No = no, Clear = true } }, S.ProfileSince);
             f.Show();
             Ui.BringUp(f);
             return f;

@@ -17,7 +17,7 @@ namespace ClassroomHud
         // 받는 서버 (시험할 때만 RAMCLOCK_NTFY로 바꿈)
         public static string Server { get { var e = Environment.GetEnvironmentVariable("RAMCLOCK_NTFY"); return string.IsNullOrEmpty(e) ? "https://ntfy.sh" : e; } }
 
-        public class Update { public int No; public string Name, Nick, Photo; }
+        public class Update { public int No; public string Name = "", Nick = "", Photo; public bool Clear; }   // Clear = 선생님이 카드 지우기
 
         public static string Topic(Settings S) { return "ramclock-" + S.ClassCode; }
 
@@ -139,6 +139,7 @@ namespace ClassroomHud
                 var st = S.StudentOf(u.No);
                 if (st == null) { st = new Student(u.No, u.Name); S.Students.Add(st); S.Students.Sort((a, b) => a.No.CompareTo(b.No)); }
                 if (string.IsNullOrWhiteSpace(st.Name) && u.Name.Length > 0) st.Name = u.Name;
+                if (u.Clear) { st.Nick = null; st.Photo = null; msgs.Add(u.No + "번 카드를 지웠어요"); continue; }
                 st.Nick = u.Nick.Length > 0 ? u.Nick : null;
                 if (u.Photo != null) st.Photo = u.Photo;
                 msgs.Add(u.No + "번 " + (st.Nick ?? st.Name ?? "") + " 카드 완성!");
