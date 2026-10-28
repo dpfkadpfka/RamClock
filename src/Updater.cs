@@ -12,7 +12,7 @@ namespace ClassroomHud
     public static class Updater
     {
         public const string Repo = "dpfkadpfka/RamClock";
-        public const string Version = "1.0.38";   // 릴리스 때 태그 번호로 바뀜
+        public const string Version = "1.0.39";   // 릴리스 때 태그 번호로 바뀜
         public static Action<string> Ready;      // 새 버전 받아 둠 → 알림
 
         static string Exe { get { return Application.ExecutablePath; } }
