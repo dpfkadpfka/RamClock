@@ -14,4 +14,7 @@ for f in sfx/*.wav; do W="$W -resource:$f,$(basename $f)"; done
 mcs -nologo -target:winexe -sdk:4.5 -optimize+ -codepage:utf8 -win32icon:app.ico \
   -r:System.Windows.Forms -r:System.Drawing -r:System.Web.Extensions -r:System.IO.Compression -r:System.Xml \
   $R $W -out:../RamClock.exe *.cs
+# mono가 만드는 버전 정보는 언어가 007f(중립)라 작업 관리자가 이름(RamClock)을 못 읽고 창 제목을 대신 보여 줌
+# → 한국어(0412)로 바꿔 작업 관리자에 "RamClock"으로 나오게
+perl -0777 -pi -e 's/0\x000\x007\x00f\x000\x004\x00b\x000\x00/0\x004\x001\x002\x000\x004\x00b\x000\x00/g; s/(T\x00r\x00a\x00n\x00s\x00l\x00a\x00t\x00i\x00o\x00n\x00\x00\x00\x00\x00)\x7f\x00\xb0\x04/$1\x12\x04\xb0\x04/g' ../RamClock.exe
 echo "built RamClock.exe"
