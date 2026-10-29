@@ -53,16 +53,21 @@ namespace ClassroomHud
             rtb.TextChanged += (o, e) =>
             {
                 if (loading) return;
-                hint.Visible = rtb.TextLength == 0;
+                bool hv = rtb.TextLength == 0; if (hint.Visible != hv) { hint.Visible = hv; Fit(); }
                 if (rtb.TextLength > 0 && rtb.SelectionAlignment != HorizontalAlignment.Center) CenterAll();
                 if (Changed != null) Changed(MemoText);
             };
-            rtb.SelectionChanged += (o, e) => { if (!loading) ShowState(); };
+            rtb.SelectionChanged += (o, e) => { if (!loading) ShowState(); BoldCaret(); };
+            rtb.GotFocus += (o, e) => BoldCaret();
+            rtb.KeyUp += (o, e) => BoldCaret();
+            rtb.MouseUp += (o, e) => BoldCaret();
+            rtb.ContentsResized += (o, e) => BoldCaret();
             Controls.Add(rtb);
 
+            // 안내 글은 입력칸 아래 한 줄에 (입력칸을 덮으면 커서가 가려짐)
             hint = new Label { Text = "여기에 바로 쓰세요 · 글자를 드래그해 고르면 그 부분만 꾸며져요", AutoSize = false, Font = small, TextAlign = ContentAlignment.MiddleCenter };
             hint.Click += (o, e) => rtb.Focus();
-            Controls.Add(hint); hint.BringToFront();
+            Controls.Add(hint);
 
             // ---- 위쪽 꾸미기 줄 ----
             cbFont = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, FlatStyle = FlatStyle.Flat, Font = small, Width = (int)(140 * Math.Max(0.85f, s)), MaxDropDownItems = 18 };
@@ -114,6 +119,34 @@ namespace ClassroomHud
             ApplyLook();
             Load(Painter.RunsOf(S), false);
             hint.Visible = rtb.TextLength == 0;
+        }
+
+        // 윈도우 기본 커서(1px)는 큰 글자 위에서 잘 안 보여서 굵게 다시 그림
+        [DllImport("user32.dll")] static extern bool CreateCaret(IntPtr h, IntPtr bmp, int w, int ht);
+        [DllImport("user32.dll")] static extern bool ShowCaret(IntPtr h);
+        [DllImport("user32.dll")] static extern bool GetCaretPos(out Point p);
+        [DllImport("user32.dll")] static extern bool SetCaretPos(int x, int y);
+        bool caretQueued;
+        void BoldCaret()
+        {
+            if (caretQueued || !rtb.IsHandleCreated) return;
+            caretQueued = true;
+            BeginInvoke(new Action(() =>
+            {
+                caretQueued = false;
+                try
+                {
+                    if (IsDisposed || !rtb.Focused || rtb.SelectionLength > 0) return;
+                    Point p; GetCaretPos(out p);
+                    var f = rtb.SelectionFont;
+                    int ht = (int)Math.Ceiling(f != null ? f.GetHeight() : BaseEm * 1.25f);
+                    int w = Math.Max(3, (int)Math.Round(3 * s));
+                    CreateCaret(rtb.Handle, IntPtr.Zero, w, ht);
+                    SetCaretPos(Math.Max(0, p.X - w / 2), p.Y);
+                    ShowCaret(rtb.Handle);
+                }
+                catch { }
+            }));
         }
 
         static float Lum(Color c) { return (0.299f * c.R + 0.587f * c.G + 0.114f * c.B) / 255f; }
@@ -379,11 +412,13 @@ namespace ClassroomHud
             int lineH = (int)Math.Ceiling(BaseEm * 1.35f);
             int th = Math.Max(lineH, Math.Min(lineH * 12, contentH > 0 ? contentH + 2 : lineH));
             int textW = w - pad * 2;
-            int h = barBottom + (int)(4 * s) + th + pad;
+            int hintH = hint.Visible ? (int)Math.Ceiling(small.GetHeight() + 6 * s) : 0;
+            int h = barBottom + (int)(4 * s) + th + hintH + pad;
             var nbForm = new Rectangle(centerX - w / 2, top, w, h);
             var tbR = new Rectangle(pad, barBottom + (int)(4 * s), textW, th);
             if (rtb.Bounds != tbR) rtb.Bounds = tbR;
-            if (hint.Bounds != tbR) hint.Bounds = tbR;
+            var hR = new Rectangle(pad, tbR.Bottom, textW, Math.Max(1, hintH));
+            if (hint.Bounds != hR) hint.Bounds = hR;
             lineY = barBottom;
             if (nbForm != lastBounds)
             {
