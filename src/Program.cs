@@ -72,6 +72,7 @@ namespace ClassroomHud
                 return;
             }
             if (args.Length >= 2 && args[0] == "--shots") { Shots(args[1]); return; }
+            if (args.Length >= 2 && args[0] == "--guide-shots") { GuideShots(args[1]); return; }
             bool created;
             using (var m = new Mutex(true, "RamClock-SingleInstance", out created))
             {
@@ -210,7 +211,7 @@ namespace ClassroomHud
             wf.Shown += (o, e) => t2.Start();
             Application.Run(wf);
 
-            var Sb = Sample(); var bds = new[] { "10-03", "10-15", "10-15", "10-28", "11-02", "03-05" };
+            var Sb = Sample(); var bds = new[] { "11-03", "11-12", "11-12", "11-20", "11-27", "03-05" };
             for (int i = 0; i < bds.Length && i < Sb.Students.Count; i++) Sb.Students[i].Birthday = bds[i];
             var bf = new BirthdayListForm(Sb) { StartPosition = FormStartPosition.Manual, Location = new Point(0, 0) };
             var tb = new System.Windows.Forms.Timer { Interval = 900 };
@@ -254,6 +255,71 @@ namespace ClassroomHud
             };
             pf.Shown += (o, e) => t3.Start();
             Application.Run(pf);
+        }
+
+        // 개발용: 사용 가이드에 넣을 위젯 그림 (배경 투명, 2배 크기) + 버튼 위치
+        static void GuideShots(string dir)
+        {
+            float K = 2f;
+            var t = new DateTime(2026, 10, 8, 9, 45, 52);
+            var work = new Rectangle(0, 0, 1800, 1400);
+            Func<Settings> def = () => { var s = Settings.Defaults(); s.Tools = new List<string> { "msgs", "pick", "memo", "week", "music", "noise", "meal", "vote" }; s.NewToolsAdded = true; s.MusicToolAdded = true; return s; };
+            Action<string, Settings, HudState, DateTime> one = (name, S, st, now) =>
+            {
+                var c = Painter.Compose(S, st, now, K, 900, 300, work);
+                c.Bmp.Save(dir + "/" + name + ".png", ImageFormat.Png);
+                var sb = new System.Text.StringBuilder("[");
+                foreach (var b in c.Btns)
+                    sb.AppendFormat(System.Globalization.CultureInfo.InvariantCulture, "{0}{{\"id\":\"{1}\",\"x\":{2},\"y\":{3},\"w\":{4},\"h\":{5}}}", sb.Length > 1 ? "," : "", b.Id, b.R.X, b.R.Y, b.R.Width, b.R.Height);
+                sb.Append("]");
+                System.IO.File.WriteAllText(dir + "/" + name + ".json", sb.ToString());
+                c.Bmp.Dispose();
+            };
+            var S0 = def();
+            one("hud_clock", S0, new HudState(), t);
+            one("hud_hover", S0, new HudState { Hover = true }, t);
+            var S1 = def(); S1.Mode = 1; one("hud_timer", S1, new HudState { Hover = true, TRemain = 183000, TDur = 300000 }, t);
+            var S2 = def(); S2.Mode = 2; var sw = new HudState { Hover = true, WBase = 65430 }; sw.Laps.Add(30120); one("hud_sw", S2, sw, t);
+            one("hud_msgs", def(), new HudState { Hover = true, Popup = 2 }, t);
+            one("hud_banner", def(), new HudState { BannerLabel = "조용히", BannerText = "말하지 않습니다. 조용히 집중합니다.", BannerUntil = t.AddSeconds(10) }, t);
+            one("hud_meal", def(), new HudState { BannerLabel = "오늘 급식", BannerText = "기장밥  ·  쇠고기미역국  ·  돈육떡갈비  ·  배추김치  ·  요구르트", BannerUntil = DateTime.MaxValue, Hover = true }, new DateTime(2026, 10, 8, 12, 10, 3));
+            var pic = new Bitmap(300, 300);
+            using (var g = Graphics.FromImage(pic))
+            {
+                g.SmoothingMode = SmoothingMode.AntiAlias;
+                using (var b = new LinearGradientBrush(new Rectangle(0, 0, 300, 300), Color.FromArgb(255, 214, 230), Color.FromArgb(214, 226, 255), 45f)) g.FillRectangle(b, 0, 0, 300, 300);
+                using (var b = new SolidBrush(Color.FromArgb(255, 120, 160))) { g.FillEllipse(b, 95, 120, 110, 110); g.FillRectangle(b, 146, 60, 8, 60); }
+                using (var b = new SolidBrush(Color.FromArgb(255, 200, 80))) g.FillEllipse(b, 138, 40, 24, 30);
+            }
+            one("hud_bday", def(), new HudState { BannerLabel = "생일 축하해요", BannerText = "오늘은 3번 박서연의 생일이에요!", BannerImage = pic, BannerUntil = t.AddSeconds(30) }, new DateTime(2026, 10, 8, 8, 30, 5));
+            var S3 = def(); S3.Memo = "오늘 준비물: 색연필, 가위\n5교시 강당 이동"; S3.MemoBgOn = true; S3.MemoBgColor = "#FFD3E0";
+            one("hud_memo", S3, new HudState { Hover = true }, t);
+            int ti = 0;
+            foreach (var th in ThemePreset.All)
+            {
+                var s2 = def(); th.Apply(s2);
+                one("theme_" + (ti++), s2, new HudState(), t);
+            }
+            // 소음 신호등
+            var Sn = def();
+            var nf = new NoiseForm(Sn, null, K);
+            var fm = typeof(NoiseForm).GetField("meter", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            var meter = (NoiseMeter)fm.GetValue(nf);
+            int[] lv = { 30, 58, 82 };
+            for (int i = 0; i < 3; i++)
+            {
+                meter.Level = lv[i];
+                typeof(NoiseForm).GetField("state", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance).SetValue(nf, i);
+                using (var bmp = new Bitmap(nf.ClientSize.Width, nf.ClientSize.Height))
+                {
+                    using (var g = Graphics.FromImage(bmp))
+                    {
+                        var m = typeof(NoiseForm).GetMethod("OnPaint", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+                        m.Invoke(nf, new object[] { new PaintEventArgs(g, new Rectangle(Point.Empty, bmp.Size)) });
+                    }
+                    bmp.Save(dir + "/noise_" + i + ".png", ImageFormat.Png);
+                }
+            }
         }
 
         static int testTop = 30;

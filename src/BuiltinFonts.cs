@@ -72,6 +72,12 @@ namespace ClassroomHud
             Def def = null;
             foreach (var d in Defs) if (d.Name == name) def = d;
             if (def == null) return null;
+            // 개발용(mono 미리보기): 따로 깐 같은 글꼴이 있으면 그것을 씀 (mono는 내장 글꼴을 네모로 그림)
+            if (Type.GetType("Mono.Runtime") != null)
+            {
+                string fam = def.Files[0].Split('-')[0];
+                try { foreach (var ff in FontFamily.Families) if (ff.Name == fam) { fams[name] = ff; return ff; } } catch { }
+            }
             try
             {
                 var pfc = new PrivateFontCollection();
