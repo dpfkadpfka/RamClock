@@ -150,7 +150,7 @@ namespace ClassroomHud
 
         static Settings Sample()
         {
-            var S = Settings.Defaults();
+            var S = Settings.Defaults(); S.FontName = "MemomentKkukkukk";
             string[] names = { "김하늘", "이도윤", "박서연", "최지호", "정예린", "강민준", "조아인", "윤시우", "장하은", "임도현" };
             for (int i = 0; i < names.Length; i++) S.Students.Add(new Student(i + 1, names[i]) { Gender = i % 2 == 0 ? "여" : "남" });
             S.Picked.AddRange(new[] { 4, 9 });
@@ -263,7 +263,7 @@ namespace ClassroomHud
             float K = 2f;
             var t = new DateTime(2026, 10, 8, 9, 45, 52);
             var work = new Rectangle(0, 0, 1800, 1400);
-            Func<Settings> def = () => { var s = Settings.Defaults(); s.Tools = new List<string> { "msgs", "pick", "memo", "week", "music", "noise", "meal", "vote" }; s.NewToolsAdded = true; s.MusicToolAdded = true; return s; };
+            Func<Settings> def = () => { var s = Settings.Defaults(); s.FontName = "MemomentKkukkukk"; s.Tools = new List<string> { "msgs", "pick", "memo", "week", "music", "noise", "meal", "vote" }; s.NewToolsAdded = true; s.MusicToolAdded = true; return s; };
             Action<string, Settings, HudState, DateTime> one = (name, S, st, now) =>
             {
                 var c = Painter.Compose(S, st, now, K, 900, 300, work);

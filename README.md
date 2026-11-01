@@ -13,4 +13,4 @@
 `src/Updater.cs`의 `Version`을 올려서 main에 올리면, Actions가 `RamClock.exe`를 만들어 Releases(v버전)에 올려요.
 
 ## 들어 있는 글꼴
-나눔고딕·나눔손글씨 펜, 주아, 도현, 검은고딕, 해바라기, 개구 — 모두 SIL Open Font License 1.1 글꼴이에요. (`src/fontres/OFL.txt`)
+나눔고딕·나눔손글씨 펜, 주아, 도현, 검은고딕, 해바라기, 개구, 학교안심(떡볶이·둥근미소·알림장·별자리) 등 — 모두 SIL Open Font License 1.1 글꼴이에요. (`src/fontres/OFL.txt`)

@@ -113,7 +113,7 @@ namespace ClassroomHud
     public class Settings
     {
         public int Mode { get; set; }                 // 0 시간표, 1 타이머, 2 스톱워치
-        public string Color { get; set; } = "#1F5FFF";
+        public string Color { get; set; } = "#FF5FA2";
         public float Scale { get; set; } = 1f;
         public int X { get; set; } = int.MinValue;     // 위젯 가운데 X (화면 좌표)
         public int Y { get; set; } = int.MinValue;     // 위젯 위쪽 Y
@@ -130,17 +130,17 @@ namespace ClassroomHud
         public bool ShowStatus { get; set; } = true;
         public bool TopMostOn { get; set; } = true;
         public bool AutoStart { get; set; }
-        public string FontName { get; set; } = "Malgun Gothic";
-        public bool DigitFont { get; set; }
+        public string FontName { get; set; } = "★ 주아";
+        public bool DigitFont { get; set; } = true;   // true = 글꼴 숫자, false = 디지털(7칸) 숫자
         public int BannerSeconds { get; set; } = 10;
         public bool Outline { get; set; } = true;
-        public bool Shadow { get; set; } = true;
-        public string SubColor { get; set; } = "";          // 날짜·안내 글자 색 (비우면 글자 색과 같게)
+        public bool Shadow { get; set; }
+        public string SubColor { get; set; } = "#858585";          // 날짜·안내 글자 색 (비우면 글자 색과 같게)
         public string FontFile { get; set; } = "";          // 불러온 글꼴 파일(media)
         public bool Bold { get; set; } = true;
         public string OutlineColor { get; set; } = "#FFFFFF";
         public int OutlineWidth { get; set; } = 4;
-        public bool Glow { get; set; }
+        public bool Glow { get; set; } = true;
         public int BgStyle { get; set; }                    // 0 투명, 1 단색, 2 그라데이션, 3 이미지
         public string BgColor { get; set; } = "#FFFFFF";
         public string BgColor2 { get; set; } = "#DDE7FF";
@@ -149,7 +149,7 @@ namespace ClassroomHud
         public int Radius { get; set; } = 18;
         public bool BgBorder { get; set; }
         public string BgBorderColor { get; set; } = "#FFFFFF";
-        public string Theme { get; set; } = "선명한 파랑";
+        public string Theme { get; set; } = "벚꽃 핑크";
         public string Memo { get; set; } = "";
         public string MemoColor { get; set; } = "#3A2E1F";
         public bool MemoBgOn { get; set; } = true;
@@ -176,7 +176,7 @@ namespace ClassroomHud
         public bool NewToolsAdded { get; set; }   // 부분 꾸미기 (없거나 글이 안 맞으면 전체 꾸미기만)
         public bool MemoOutline { get; set; }
         public string MemoOutlineColor { get; set; } = "#FFFFFF";
-        public string ClockFontName { get; set; } = "";     // 비우면 글자 글꼴과 같게
+        public string ClockFontName { get; set; } = "★ 학교안심 떡볶이";     // 비우면 글자 글꼴과 같게
         public string ClockFontFile { get; set; } = "";
         public bool ClockBold { get; set; } = true;
         public bool? ClockOutlineSet { get; set; }          // 예전 설정 옮기기용
@@ -508,11 +508,12 @@ namespace ClassroomHud
     // 한 번에 바꾸는 꾸미기 묶음
     public class ThemePreset
     {
-        public string Name, Color, Sub, OutlineColor, Bg1, Bg2, Border;
+        public string Name, Color, Sub, OutlineColor, Bg1, Bg2, Border, Font, ClockFont;
         public bool DigitFont, Outline, Shadow, Glow, BgBorder;
         public int OutlineWidth = 4, BgStyle, Opacity = 85, Radius = 18;
 
         public static readonly ThemePreset[] All = {
+            new ThemePreset { Name = "벚꽃 핑크", Color = "#FF5FA2", Sub = "#858585", DigitFont = true, Outline = true, OutlineColor = "#FFFFFF", Glow = true, Font = "★ 주아", ClockFont = "★ 학교안심 떡볶이" },
             new ThemePreset { Name = "선명한 파랑", Color = "#1F5FFF", Sub = "", Outline = true, OutlineColor = "#FFFFFF", Shadow = true },
             new ThemePreset { Name = "미니멀 화이트", Color = "#FFFFFF", Sub = "", DigitFont = true, Shadow = true, OutlineColor = "#1A2233" },
             new ThemePreset { Name = "유리 카드", Color = "#FFFFFF", Sub = "", DigitFont = true, BgStyle = 1, Bg1 = "#0F172A", Opacity = 62, Radius = 24, BgBorder = true, Border = "#FFFFFF" },
@@ -533,6 +534,8 @@ namespace ClassroomHud
             s.BgColor2 = Bg2 ?? s.BgColor;
             s.BgOpacity = Opacity; s.Radius = Radius; s.BgBorder = BgBorder;
             if (Border != null) s.BgBorderColor = Border;
+            if (Font != null) { s.FontName = Font; s.FontFile = ""; }
+            if (ClockFont != null) { s.ClockFontName = ClockFont; s.ClockFontFile = ""; }
         }
     }
 

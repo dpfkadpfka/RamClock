@@ -28,6 +28,7 @@ namespace ClassroomHud
             new Def("★ 페이퍼로지 블랙", "Paperlogy-9Black.ttf"),
             new Def("★ 카페24 써라운드", "Cafe24Ssurround.ttf"),
             new Def("★ 여기어때 잘난체", "Jalnan.ttf"),
+            new Def("★ 학교안심 떡볶이", "HakgyoansimTteokbokki-B.ttf"),
             new Def("★ 학교안심 둥근미소", "HakgyoansimDunggeunmiso-B.ttf"),
             new Def("★ 학교안심 알림장", "HakgyoansimAllimjang-B.ttf"),
             new Def("★ 학교안심 별자리", "HakgyoansimByeoljari-B.ttf"),
@@ -75,8 +76,8 @@ namespace ClassroomHud
             // 개발용(mono 미리보기): 따로 깐 같은 글꼴이 있으면 그것을 씀 (mono는 내장 글꼴을 네모로 그림)
             if (Type.GetType("Mono.Runtime") != null)
             {
-                string fam = def.Files[0].Split('-')[0];
-                try { foreach (var ff in FontFamily.Families) if (ff.Name == fam) { fams[name] = ff; return ff; } } catch { }
+                string fam = def.Files[0].Split('-')[0].ToLowerInvariant();
+                try { foreach (var ff in FontFamily.Families) if (ff.Name.Replace(" ", "").ToLowerInvariant().StartsWith(fam)) { fams[name] = ff; return ff; } } catch { }
             }
             try
             {
