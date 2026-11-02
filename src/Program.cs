@@ -73,6 +73,7 @@ namespace ClassroomHud
             }
             if (args.Length >= 2 && args[0] == "--shots") { Shots(args[1]); return; }
             if (args.Length >= 2 && args[0] == "--guide-shots") { GuideShots(args[1]); return; }
+            if (SelfInstall(args)) return;
             bool created;
             using (var m = new Mutex(true, "RamClock-SingleInstance", out created))
             {
@@ -94,6 +95,90 @@ namespace ClassroomHud
                 Application.Run(new HudForm());
                 GC.KeepAlive(m);
             }
+        }
+
+        // ---------- 제자리에 깔기 ----------
+        // 받은 파일이 다운로드 폴더 등에 엉뚱한 이름(예: "주간학습안내 (1).exe")으로 있어도
+        // 처음 켤 때 %LocalAppData%\Programs\RamClock\RamClock.exe 로 옮겨 그곳에서 실행하고,
+        // 바탕화면·시작 메뉴에 "RamClock" 바로가기를 만든 뒤 원래 파일은 지운다.
+        public static string InstallPath
+        {
+            get { return System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Programs", "RamClock", "RamClock.exe"); }
+        }
+
+        static bool SelfInstall(string[] args)
+        {
+            if (Type.GetType("Mono.Runtime") != null) return false;
+            string cur = Application.ExecutablePath, target = InstallPath;
+            int mi = Array.IndexOf(args, "--moved");
+            if (mi >= 0 && mi + 1 < args.Length) DeleteLater(args[mi + 1]);
+            try
+            {
+                if (string.Equals(System.IO.Path.GetFullPath(cur), System.IO.Path.GetFullPath(target), StringComparison.OrdinalIgnoreCase)) return false;
+                bool restart = Array.IndexOf(args, "--restart") >= 0;
+                // 깔린 RamClock이 이미 켜져 있으면 덮어쓸 수 없으니 그대로 둠 (아래에서 "이미 실행 중" 안내)
+                if (!restart)
+                {
+                    Mutex probe;
+                    if (Mutex.TryOpenExisting("RamClock-SingleInstance", out probe)) { probe.Dispose(); return false; }
+                }
+                System.IO.Directory.CreateDirectory(System.IO.Path.GetDirectoryName(target));
+                for (int i = 0; ; i++)
+                {
+                    try { System.IO.File.Copy(cur, target, true); break; }
+                    catch { if (i >= 20) throw; Thread.Sleep(500); }   // 업데이트로 다시 켜질 때 옛 프로그램이 닫히기를 기다림
+                }
+                try { DeleteFile(target + ":Zone.Identifier"); } catch { }   // 인터넷에서 받은 표시 지우기 (보안 경고 다시 안 뜨게)
+                MakeShortcuts(target);
+                System.Diagnostics.Process.Start(target, "--restart --moved \"" + cur + "\"");
+                return true;
+            }
+            catch (Exception ex) { Log(ex); return false; }   // 옮기지 못하면 그냥 지금 자리에서 실행
+        }
+
+        [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)] static extern bool DeleteFile(string path);
+
+        static void DeleteLater(string path)
+        {
+            if (string.IsNullOrEmpty(path) || !path.EndsWith(".exe", StringComparison.OrdinalIgnoreCase)) return;
+            if (string.Equals(System.IO.Path.GetFullPath(path), System.IO.Path.GetFullPath(InstallPath), StringComparison.OrdinalIgnoreCase)) return;
+            new Thread(() =>
+            {
+                for (int i = 0; i < 40; i++)
+                {
+                    try
+                    {
+                        if (System.IO.File.Exists(path)) System.IO.File.Delete(path);
+                        string old = System.IO.Path.Combine(System.IO.Path.GetDirectoryName(path), System.IO.Path.GetFileNameWithoutExtension(path) + ".old");
+                        if (System.IO.File.Exists(old)) System.IO.File.Delete(old);
+                        return;
+                    }
+                    catch { Thread.Sleep(500); }
+                }
+            }) { IsBackground = true }.Start();
+        }
+
+        static void MakeShortcuts(string target)
+        {
+            try
+            {
+                var shellType = Type.GetTypeFromProgID("WScript.Shell");
+                if (shellType == null) return;
+                dynamic shell = Activator.CreateInstance(shellType);
+                foreach (var folder in new[] { Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory), Environment.GetFolderPath(Environment.SpecialFolder.Programs) })
+                {
+                    if (string.IsNullOrEmpty(folder)) continue;
+                    string lnk = System.IO.Path.Combine(folder, "RamClock.lnk");
+                    dynamic sc = shell.CreateShortcut(lnk);
+                    if (System.IO.File.Exists(lnk) && string.Equals((string)sc.TargetPath, target, StringComparison.OrdinalIgnoreCase)) continue;
+                    sc.TargetPath = target;
+                    sc.WorkingDirectory = System.IO.Path.GetDirectoryName(target);
+                    sc.IconLocation = target + ",0";
+                    sc.Description = "RamClock 교실 시계";
+                    sc.Save();
+                }
+            }
+            catch (Exception ex) { Log(ex); }
         }
 
         // 개발용: 창 없이 그림만 PNG로 저장
