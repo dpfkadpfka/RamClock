@@ -396,7 +396,8 @@ namespace ClassroomHud
         // ---------- 쉬는 시간 알림 소리 (여러 가지 중 고르기) ----------
         public static readonly string[][] BreakSounds = {
             new[] { "bell", "학교 종 (딩동댕동)" }, new[] { "marimba", "실로폰 (도미솔도)" }, new[] { "musicbox", "오르골" },
-            new[] { "8bit", "8비트 게임" }, new[] { "chime", "맑은 차임벨" }, new[] { "bird", "새소리 (짹짹)" } };
+            new[] { "8bit", "8비트 게임" }, new[] { "chime", "맑은 차임벨" }, new[] { "bird", "새소리 (짹짹)" },
+            new[] { "kpop", "케이팝 비트" }, new[] { "lofi", "로파이 (잔잔한 비트)" }, new[] { "bounce", "통통 마림바 비트" }, new[] { "synth", "신스팝 아르페지오" } };
         static readonly System.Collections.Generic.Dictionary<string, SoundPlayer> breakCache = new System.Collections.Generic.Dictionary<string, SoundPlayer>();
 
         // id: 위 목록의 이름, 또는 "file:미디어 파일 이름"
@@ -495,6 +496,10 @@ namespace ClassroomHud
                             }
                         }
                     break;
+                case "kpop": smp = Kpop(rate); break;
+                case "lofi": smp = Lofi(rate); break;
+                case "bounce": smp = Bounce(rate); break;
+                case "synth": smp = Synth(rate); break;
                 default:   // 학교 종: 미 도 레 솔 / 솔 레 미 도
                     smp = new double[(int)(rate * 4.4)];
                     { int[] m = { 76, 72, 74, 67, 67, 74, 76, 72 }; for (int i = 0; i < 8; i++) Note(smp, rate, Hz(m[i]), i * 0.42 + (i >= 4 ? 0.25 : 0), i == 7 ? 1.6 : 1.1, "bell", 0.2); }
@@ -505,6 +510,114 @@ namespace ClassroomHud
             double target = id == "8bit" ? 0.45 : 0.8;
             if (peak > 0) for (int i = 0; i < smp.Length; i++) smp[i] *= target / peak;
             return smp;
+        }
+
+        // ---------- 요즘 느낌 비트 (직접 지은 짧은 멜로디) ----------
+        static readonly Random rnd = new Random(7);
+        static void Kick(double[] s, int r, double st, double v)
+        {
+            int a = (int)(st * r); double ph = 0;
+            for (int i = 0; i < (int)(0.32 * r) && a + i < s.Length; i++) { double t = i / (double)r; double f = 45 + 110 * Math.Exp(-t * 28); ph += 2 * Math.PI * f / r; s[a + i] += v * Math.Sin(ph) * Math.Exp(-t * 9); }
+        }
+        static void Clap(double[] s, int r, double st, double v)
+        {
+            int a = (int)(st * r); double lp = 0;
+            for (int i = 0; i < (int)(0.22 * r) && a + i < s.Length; i++) { double t = i / (double)r; double n = rnd.NextDouble() * 2 - 1; lp += 0.45 * (n - lp); double hp = lp; double env = (t < 0.012 ? 0.7 : 1) * Math.Exp(-t * 18); s[a + i] += v * hp * env; }
+        }
+        static void Hat(double[] s, int r, double st, double v)
+        {
+            int a = (int)(st * r); double prev = 0;
+            for (int i = 0; i < (int)(0.05 * r) && a + i < s.Length; i++) { double t = i / (double)r; double n = rnd.NextDouble() * 2 - 1; s[a + i] += v * (n - prev) * Math.Exp(-t * 70); prev = n; }
+        }
+        // 신스 소리: pluck(통통 튀는 신스) · saw(톱니 신스) · rhodes(전자 피아노) · bass · mar(마림바)
+        static void Syn(double[] s, int r, int midi, double st, double len, string kind, double v)
+        {
+            double f = Hz(midi); int a = (int)(st * r), n = (int)((len + 0.25) * r);
+            for (int i = 0; i < n && a + i < s.Length; i++)
+            {
+                double t = i / (double)r, x = 0, env;
+                double rel = t < len ? 1 : Math.Exp(-(t - len) * 25);
+                switch (kind)
+                {
+                    case "pluck":
+                        env = Math.Exp(-t * 7) * rel;
+                        for (int h = 1; h <= 6; h++) x += Math.Sin(2 * Math.PI * f * h * t) / h * Math.Exp(-t * h * 2.5);
+                        x *= 0.55; break;
+                    case "saw":
+                        env = Math.Min(1, t / 0.01) * (0.6 + 0.4 * Math.Exp(-t * 6)) * rel;
+                        for (int h = 1; h <= 8; h++) x += Math.Sin(2 * Math.PI * f * h * t * (1 + 0.003 * (h % 2))) / h;
+                        x *= 0.4; break;
+                    case "rhodes":
+                        env = Math.Min(1, t / 0.006) * Math.Exp(-t * 1.6) * rel;
+                        x = Math.Sin(2 * Math.PI * f * t + 0.8 * Math.Sin(2 * Math.PI * f * t) * Math.Exp(-t * 4)) * (1 + 0.15 * Math.Sin(2 * Math.PI * 5 * t));
+                        break;
+                    case "bass":
+                        env = Math.Min(1, t / 0.005) * (0.5 + 0.5 * Math.Exp(-t * 5)) * rel;
+                        x = Math.Sin(2 * Math.PI * f * t) + 0.3 * Math.Sin(2 * Math.PI * f * 2 * t);
+                        break;
+                    default:
+                        env = Math.Min(1, t / 0.003) * rel;
+                        x = Math.Sin(2 * Math.PI * f * t) * Math.Exp(-t * 6) + 0.35 * Math.Sin(2 * Math.PI * f * 4 * t) * Math.Exp(-t * 16);
+                        break;
+                }
+                s[a + i] += v * env * x;
+            }
+        }
+        // 멜로디 적기: "음높이:길이(8분음표 개수)", 쉼표는 r
+        static void Line(double[] s, int r, string notes, double st, double eighth, string kind, double v)
+        {
+            double t = st;
+            foreach (var tok in notes.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries))
+            {
+                var p = tok.Split(':'); double d = p.Length > 1 ? double.Parse(p[1], System.Globalization.CultureInfo.InvariantCulture) : 1;
+                if (p[0] != "r") Syn(s, r, int.Parse(p[0]), t, eighth * d * 0.9, kind, v);
+                t += eighth * d;
+            }
+        }
+
+        static double[] Kpop(int r)   // 120bpm 2마디: 킥·클랩·하이햇 + 통통 신스 훅
+        {
+            double e = 0.25; var s = new double[(int)(r * (16 * e + 0.8))];
+            for (int b = 0; b < 8; b++) { if (b % 2 == 0) Kick(s, r, b * 2 * e, 0.9); else Clap(s, r, b * 2 * e, 0.22); }
+            Kick(s, r, 7 * e, 0.6); Kick(s, r, 11 * e, 0.6);
+            for (int i = 0; i < 16; i++) Hat(s, r, i * e + e / 2, 0.08);
+            Line(s, r, "60:2 r:1 60:1 63:2 58:2 56:2 r:1 56:1 58:2 63:2", 0, e, "bass", 0.35);
+            Line(s, r, "72 75 r 77 79:2 77 75 72 r 70 72 75:2 82:2", 0, e, "pluck", 0.35);
+            return s;
+        }
+        static double[] Lofi(int r)   // 82bpm: 전자 피아노 화음 + 부드러운 비트 + 레코드 잡음
+        {
+            double e = 60.0 / 82 / 2; var s = new double[(int)(r * (16 * e + 1.2))];
+            int[][] ch = { new[] { 53, 57, 60, 64 }, new[] { 52, 55, 59, 62 }, new[] { 50, 53, 57, 60 }, new[] { 48, 52, 55, 59 } };
+            for (int c = 0; c < 4; c++) foreach (var m in ch[c]) Syn(s, r, m, c * 4 * e + 0.012 * (m % 3), 4 * e, "rhodes", 0.11);
+            Line(s, r, "r:2 76 74:1 72:2 r:2 71 72 74:2 r 79:3", 0, e, "rhodes", 0.16);
+            for (int b = 0; b < 4; b++) { Kick(s, r, b * 4 * e, 0.55); Kick(s, r, b * 4 * e + 2.5 * e, 0.35); Clap(s, r, b * 4 * e + 2 * e, 0.1); }
+            for (int i = 0; i < 16; i++) Hat(s, r, i * e, 0.04);
+            for (int i = 0; i < s.Length; i += r / 9 + rnd.Next(r / 12)) if (i < s.Length) s[i] += 0.12 * (rnd.NextDouble() - 0.5);
+            return s;
+        }
+        static double[] Bounce(int r)   // 116bpm: 엇박으로 통통 튀는 마림바 + 가벼운 비트
+        {
+            double e = 60.0 / 116 / 2; var s = new double[(int)(r * (16 * e + 0.9))];
+            Line(s, r, "79:1.5 74:0.5 r:1 79 83:1.5 81:0.5 79:1 r:1 76:1.5 74:0.5 r:1 71 74:1.5 79:2.5", 0, e, "mar", 0.4);
+            Line(s, r, "43:2 50:2 43:2 50:2 40:2 47:2 43:4", 0, e, "mar", 0.25);
+            for (int b = 0; b < 4; b++) { Kick(s, r, b * 4 * e, 0.5); Clap(s, r, b * 4 * e + 2 * e, 0.12); }
+            for (int i = 0; i < 16; i += 2) Hat(s, r, i * e + e, 0.06);
+            return s;
+        }
+        static double[] Synth(int r)   // 118bpm: 16분음표 아르페지오 + 베이스 (라-파-도-솔)
+        {
+            double sx = 60.0 / 118 / 4; var s = new double[(int)(r * (32 * sx + 1.0))];
+            int[][] ar = { new[] { 69, 72, 76, 81 }, new[] { 65, 69, 72, 77 }, new[] { 67, 72, 76, 79 }, new[] { 67, 71, 74, 79 } };
+            int[] bass = { 45, 41, 48, 43 };
+            for (int c = 0; c < 4; c++)
+            {
+                for (int k = 0; k < 8; k++) Syn(s, r, ar[c][k % 4] + (k >= 4 ? 12 : 0), (c * 8 + k) * sx, sx * 0.8, "saw", 0.12);
+                Syn(s, r, bass[c], c * 8 * sx, 8 * sx * 0.95, "bass", 0.35);
+                Kick(s, r, c * 8 * sx, 0.6); Clap(s, r, (c * 8 + 4) * sx, 0.14);
+            }
+            Syn(s, r, 81, 32 * sx, 0.6, "pluck", 0.35);
+            return s;
         }
 
         static void Tone(double[] smp, int rate, double f, double start, double len)
