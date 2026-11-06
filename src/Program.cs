@@ -73,6 +73,7 @@ namespace ClassroomHud
             }
             if (args.Length >= 2 && args[0] == "--shots") { Shots(args[1]); return; }
             if (args.Length >= 2 && args[0] == "--guide-shots") { GuideShots(args[1]); return; }
+            if (args.Length >= 2 && args[0] == "--break-wavs") { foreach (var b in Audio.BreakSounds) System.IO.File.WriteAllBytes(System.IO.Path.Combine(args[1], b[0] + ".wav"), Audio.BreakWav(b[0])); return; }
             if (SelfInstall(args)) return;
             bool created;
             using (var m = new Mutex(true, "RamClock-SingleInstance", out created))

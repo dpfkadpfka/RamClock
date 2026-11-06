@@ -952,8 +952,35 @@ namespace ClassroomHud
             };
             vr.Controls.Add(bHear);
             var vnote = Note("목소리를 더 넣으려면 윈도우 설정 → 시간 및 언어 → 음성 → [음성 추가]에서 한국어 목소리를 받아요. 받은 목소리는 이 목록에 바로 나와요.");
+            // 쉬는 시간 시작 알림: 켜고 끄기 + 소리 고르기
+            var br = Flow();
+            chkBreak = new Toggle { Text = "쉬는 시간 시작 알림", AutoSize = true, Checked = R.BreakChimeOn, Margin = new Padding(3, 7, 14, 3) };
+            br.Controls.Add(chkBreak);
+            br.Controls.Add(new Label { Text = "소리", AutoSize = true, Margin = new Padding(3, 9, 6, 3) });
+            cbBreak = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 200, Margin = new Padding(0, 5, 8, 3) };
+            foreach (var bs in Audio.BreakSounds) cbBreak.Items.Add(bs[1]);
+            cbBreak.Items.Add("내 소리 파일…");
+            breakFile = R.BreakChimeSound != null && R.BreakChimeSound.StartsWith("file:") ? R.BreakChimeSound.Substring(5) : null;
+            if (breakFile != null) { cbBreak.Items[cbBreak.Items.Count - 1] = "내 소리: " + breakFile; cbBreak.SelectedIndex = cbBreak.Items.Count - 1; }
+            else { int bi = 0; for (int i = 0; i < Audio.BreakSounds.Length; i++) if (Audio.BreakSounds[i][0] == R.BreakChimeSound) bi = i; cbBreak.SelectedIndex = bi; }
+            int lastBreakIdx = cbBreak.SelectedIndex;
+            cbBreak.SelectionChangeCommitted += (o, e) =>
+            {
+                if (cbBreak.SelectedIndex != cbBreak.Items.Count - 1) { lastBreakIdx = cbBreak.SelectedIndex; Audio.PlayBreak(BreakId()); return; }
+                using (var od = new OpenFileDialog { Filter = "소리 파일|*.mp3;*.wav;*.wma;*.m4a", Title = "쉬는 시간 알림 소리" })
+                {
+                    if (od.ShowDialog(this) == DialogResult.OK) { var n = Media.Import(od.FileName); if (n != null) { breakFile = n; cbBreak.Items[cbBreak.Items.Count - 1] = "내 소리: " + n; cbBreak.SelectedIndex = cbBreak.Items.Count - 1; lastBreakIdx = cbBreak.SelectedIndex; Audio.PlayBreak(BreakId()); return; } }
+                    if (breakFile == null) cbBreak.SelectedIndex = lastBreakIdx;
+                }
+            };
+            br.Controls.Add(cbBreak);
+            var bBreakHear = B("▶ 듣기");
+            bBreakHear.Click += (o, e) => Audio.PlayBreak(BreakId());
+            br.Controls.Add(bBreakHear);
+            chkBreakBanner = new Toggle { Text = "화면에도 \"쉬는 시간이에요\" 띄우기", AutoSize = true, Checked = R.BreakChimeBanner, Margin = new Padding(10, 7, 3, 3) };
+            br.Controls.Add(chkBreakBanner);
             var vbox = new FlowLayoutPanel { FlowDirection = FlowDirection.TopDown, AutoSize = true, WrapContents = false, Margin = new Padding(0) };
-            vbox.Controls.Add(top); vbox.Controls.Add(vr); vbox.Controls.Add(vnote);
+            vbox.Controls.Add(top); vbox.Controls.Add(br); vbox.Controls.Add(vr); vbox.Controls.Add(vnote);
             top = vbox;
             if (!Audio.HasKoreanVoice)
                 top.Controls.Add(new Label { Text = "컴퓨터에 한국어 음성이 없어요. 녹음이나 소리 파일을 쓰거나, 윈도우 설정 > 시간 및 언어 > 음성에서 추가해 주세요.", AutoSize = true, ForeColor = Color.Firebrick, Margin = new Padding(3, 7, 3, 3), MaximumSize = new Size(860, 0) });
@@ -1085,8 +1112,18 @@ namespace ClassroomHud
             return i;
         }
 
+        Toggle chkBreak, chkBreakBanner; ComboBox cbBreak; string breakFile;
+        string BreakId()
+        {
+            if (cbBreak == null) return R.BreakChimeSound;
+            int i = cbBreak.SelectedIndex;
+            if (i >= 0 && i < Audio.BreakSounds.Length) return Audio.BreakSounds[i][0];
+            return breakFile != null ? "file:" + breakFile : "bell";
+        }
+
         void CommitVoice()
         {
+            if (chkBreak != null) { R.BreakChimeOn = chkBreak.Checked; R.BreakChimeBanner = chkBreakBanner.Checked; R.BreakChimeSound = BreakId(); }
             gRules.EndEdit(); gMsgs.EndEdit();
             R.Voice = chkVoice.Checked; R.Sfx = chkSfx.Checked;
             if (cbVoice != null) { R.VoiceName = cbVoice.SelectedIndex <= 0 ? "" : cbVoice.SelectedItem as string; R.VoiceRate = slRate.Value; }

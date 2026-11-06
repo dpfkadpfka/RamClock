@@ -393,6 +393,120 @@ namespace ClassroomHud
             return ms.ToArray();
         }
 
+        // ---------- 쉬는 시간 알림 소리 (여러 가지 중 고르기) ----------
+        public static readonly string[][] BreakSounds = {
+            new[] { "bell", "학교 종 (딩동댕동)" }, new[] { "marimba", "실로폰 (도미솔도)" }, new[] { "musicbox", "오르골" },
+            new[] { "8bit", "8비트 게임" }, new[] { "chime", "맑은 차임벨" }, new[] { "bird", "새소리 (짹짹)" } };
+        static readonly System.Collections.Generic.Dictionary<string, SoundPlayer> breakCache = new System.Collections.Generic.Dictionary<string, SoundPlayer>();
+
+        // id: 위 목록의 이름, 또는 "file:미디어 파일 이름"
+        public static void PlayBreak(string id)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(id)) id = "bell";
+                if (id.StartsWith("file:"))
+                {
+                    string f = Settings.MediaPath(id.Substring(5));
+                    if (f != null && PlayFile(f, 1)) return;
+                    id = "bell";
+                }
+                SoundPlayer p;
+                if (!breakCache.TryGetValue(id, out p))
+                {
+                    p = new SoundPlayer(new MemoryStream(Wav(BreakWave(id), 22050))); p.Load();
+                    breakCache[id] = p;
+                }
+                StopFile(); p.Play();
+            }
+            catch { }
+        }
+
+        public static byte[] BreakWav(string id) { return Wav(BreakWave(id), 22050); }
+
+        static double Hz(int midi) { return 440.0 * Math.Pow(2, (midi - 69) / 12.0); }
+
+        // timbre: bell 종 · mar 실로폰 · box 오르골 · sq 8비트 · sine 차임
+        static void Note(double[] smp, int rate, double f, double start, double len, string timbre, double vol)
+        {
+            int a = (int)(start * rate), b = Math.Min(smp.Length, (int)((start + len) * rate));
+            for (int i = Math.Max(0, a); i < b; i++)
+            {
+                double t = (i - a) / (double)rate, x;
+                double att = t < 0.005 ? t / 0.005 : 1.0;
+                switch (timbre)
+                {
+                    case "bell":
+                        x = Math.Sin(2 * Math.PI * f * t) * Math.Exp(-t * 1.6) + 0.45 * Math.Sin(2 * Math.PI * f * 2.76 * t) * Math.Exp(-t * 3.5)
+                          + 0.25 * Math.Sin(2 * Math.PI * f * 5.4 * t) * Math.Exp(-t * 6) + 0.2 * Math.Sin(2 * Math.PI * f * 0.5 * t) * Math.Exp(-t * 1.2);
+                        break;
+                    case "mar":
+                        x = Math.Sin(2 * Math.PI * f * t) * Math.Exp(-t * 5) + 0.35 * Math.Sin(2 * Math.PI * f * 4 * t) * Math.Exp(-t * 14);
+                        break;
+                    case "box":
+                        x = Math.Sin(2 * Math.PI * f * t) * Math.Exp(-t * 2.8) + 0.3 * Math.Sin(2 * Math.PI * f * 3 * t) * Math.Exp(-t * 7);
+                        break;
+                    case "sq":
+                        x = (Math.Sin(2 * Math.PI * f * t) >= 0 ? 0.55 : -0.55) * (t < len - 0.02 ? 1 : Math.Max(0, (len - t) / 0.02));
+                        break;
+                    default:
+                        x = Math.Sin(2 * Math.PI * f * t) * Math.Exp(-t * 1.3) + 0.15 * Math.Sin(2 * Math.PI * f * 2 * t) * Math.Exp(-t * 3);
+                        break;
+                }
+                smp[i] += vol * att * x;
+            }
+        }
+
+        static double[] BreakWave(string id)
+        {
+            int rate = 22050;
+            double[] smp;
+            switch (id)
+            {
+                case "marimba":
+                    smp = new double[(int)(rate * 1.8)];
+                    { int[] m = { 72, 76, 79, 84 }; for (int i = 0; i < 4; i++) Note(smp, rate, Hz(m[i]), i * 0.16, 1.2, "mar", 0.32); Note(smp, rate, Hz(88), 0.64, 1.1, "mar", 0.18); }
+                    break;
+                case "musicbox":
+                    smp = new double[(int)(rate * 2.6)];
+                    { int[] m = { 84, 79, 76, 79, 84, 88, 91 }; double[] at = { 0, 0.22, 0.44, 0.66, 0.88, 1.1, 1.32 }; for (int i = 0; i < m.Length; i++) Note(smp, rate, Hz(m[i]), at[i], 1.2, "box", 0.22); }
+                    break;
+                case "8bit":
+                    smp = new double[(int)(rate * 1.2)];
+                    { int[] m = { 72, 76, 79, 84, 79, 84 }; double[] at = { 0, 0.09, 0.18, 0.27, 0.40, 0.49 }; double[] ln = { 0.08, 0.08, 0.08, 0.12, 0.08, 0.45 }; for (int i = 0; i < m.Length; i++) Note(smp, rate, Hz(m[i]), at[i], ln[i], "sq", 0.16); }
+                    break;
+                case "chime":
+                    smp = new double[(int)(rate * 3.0)];
+                    { int[] m = { 81, 77, 74 }; for (int i = 0; i < 3; i++) Note(smp, rate, Hz(m[i]), i * 0.55, 2.2, "sine", 0.3); }
+                    break;
+                case "bird":
+                    smp = new double[(int)(rate * 1.6)];
+                    for (int k = 0; k < 2; k++)
+                        for (int c = 0; c < 3; c++)
+                        {
+                            double st = k * 0.75 + c * 0.13, ln = 0.09;
+                            int a = (int)(st * rate), b = Math.Min(smp.Length, (int)((st + ln) * rate)); double ph = 0;
+                            for (int i = a; i < b; i++)
+                            {
+                                double t = (i - a) / (double)rate, u = t / ln;
+                                double f = 3200 + 1500 * Math.Sin(Math.PI * u) + 300 * Math.Sin(2 * Math.PI * 40 * t);
+                                ph += 2 * Math.PI * f / rate;
+                                smp[i] += 0.28 * Math.Sin(Math.PI * u) * Math.Sin(ph);
+                            }
+                        }
+                    break;
+                default:   // 학교 종: 미 도 레 솔 / 솔 레 미 도
+                    smp = new double[(int)(rate * 4.4)];
+                    { int[] m = { 76, 72, 74, 67, 67, 74, 76, 72 }; for (int i = 0; i < 8; i++) Note(smp, rate, Hz(m[i]), i * 0.42 + (i >= 4 ? 0.25 : 0), i == 7 ? 1.6 : 1.1, "bell", 0.2); }
+                    break;
+            }
+            // 소리마다 크기를 비슷하게 맞추기 (8비트는 원래 귀에 크게 들려서 조금 작게)
+            double peak = 0; foreach (var v in smp) peak = Math.Max(peak, Math.Abs(v));
+            double target = id == "8bit" ? 0.45 : 0.8;
+            if (peak > 0) for (int i = 0; i < smp.Length; i++) smp[i] *= target / peak;
+            return smp;
+        }
+
         static void Tone(double[] smp, int rate, double f, double start, double len)
         {
             int a = (int)(start * rate), b = Math.Min(smp.Length, (int)((start + len) * rate));

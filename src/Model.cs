@@ -164,6 +164,9 @@ namespace ClassroomHud
         public string ClassTitle { get; set; }    // 예: 2학년 1반
         public string ProfileSince { get; set; }  // 마지막으로 받은 메시지 id
         public bool BirthdayOn { get; set; } = true;   // 생일날 아침 축하 안내
+        public bool BreakChimeOn { get; set; } = true;     // 쉬는 시간 시작할 때 알림 소리
+        public string BreakChimeSound { get; set; } = "bell";   // Audio.BreakSounds 이름, 또는 "file:미디어 이름"
+        public bool BreakChimeBanner { get; set; } = true;  // 화면에 "쉬는 시간이에요" 잠깐 띄우기   // 생일날 아침 축하 안내
         // 소음 신호등 기준 (0~100)
         public int NoiseYellow { get; set; } = 45;
         public int NoiseRed { get; set; } = 70;

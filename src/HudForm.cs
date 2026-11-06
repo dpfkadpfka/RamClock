@@ -253,6 +253,16 @@ namespace ClassroomHud
             if (dow >= 1 && dow <= 5 && S.MealAtLunch && !string.IsNullOrEmpty(S.SchoolCode) && !fired.Contains("meal"))
                 foreach (var sl in Sched.Slots(S, now))
                     if (sl.Type == "lunch" && sec >= sl.StartMin * 60 && sec < sl.StartMin * 60 + 60) { fired.Add("meal"); ShowMeal(false); break; }
+            // 쉬는 시간 시작 알림 (켜고 끌 수 있음, 소리 고르기)
+            if (dow >= 1 && dow <= 5 && S.BreakChimeOn)
+                foreach (var sl in Sched.Slots(S, now))
+                    if (sl.Type == "break" && sl.StartMin * 60 > lastSec && sl.StartMin * 60 <= sec && sec - sl.StartMin * 60 <= 5 && !fired.Contains("brk" + sl.StartMin))
+                    {
+                        fired.Add("brk" + sl.StartMin);
+                        Audio.PlayBreak(S.BreakChimeSound);
+                        if (S.BreakChimeBanner) ShowBanner("쉬는 시간이에요", "", 6);
+                        ver++;
+                    }
             if (dow >= 1 && dow <= 5)
             {
                 foreach (var ev in Sched.DayEvents(S, now))
