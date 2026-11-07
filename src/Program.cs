@@ -34,6 +34,10 @@ namespace ClassroomHud
         static void Main(string[] args)
         {
             if (args.Length == 0 || args[0] != "--shots") DpiAware();
+            if (args.Length >= 1 && args[0] == "--noop") return;
+            string exeName = System.IO.Path.GetFileNameWithoutExtension(Application.ExecutablePath);
+            if (args.Length == 0 && exeName.StartsWith("RamClockShots", StringComparison.OrdinalIgnoreCase))
+            { DevShots.Run(System.IO.Path.Combine(System.IO.Path.GetDirectoryName(Application.ExecutablePath), "out"), exeName.Length > 14 ? exeName.Substring(14) : ""); return; }
             if (args.Length >= 2 && args[0] == "--render-test") { RenderTest(args[1]); return; }
             if (args.Length >= 2 && args[0] == "--tpl")
             {
@@ -73,6 +77,7 @@ namespace ClassroomHud
             }
             if (args.Length >= 2 && args[0] == "--shots") { Shots(args[1]); return; }
             if (args.Length >= 2 && args[0] == "--guide-shots") { GuideShots(args[1]); return; }
+            if (args.Length >= 2 && args[0] == "--vote-page") { System.IO.File.WriteAllText(args[1], VoteForm.DumpPage(Settings.Defaults())); return; }
             if (args.Length >= 2 && args[0] == "--break-wavs") { foreach (var b in Audio.BreakSounds) System.IO.File.WriteAllBytes(System.IO.Path.Combine(args[1], b[0] + ".wav"), Audio.BreakWav(b[0])); return; }
             if (SelfInstall(args)) return;
             bool created;
@@ -279,6 +284,7 @@ namespace ClassroomHud
                 var s2 = Settings.Defaults(); th.Apply(s2);
                 Save(dir + "/theme_" + (ti++) + ".png", s2, new HudState(), new DateTime(2026, 10, 8, 9, 45, 52), new Rectangle(0, 0, 900, 640), th.BgStyle == 0 && th.Color == "#FFFFFF" ? 1 : (ti % 2 == 0 ? 0 : 1));
             }
+            if (!ShotsTailOnly) {
             var sf = new SettingsForm(S.Clone()) { StartPosition = FormStartPosition.Manual, Location = new Point(0, 0) }; if (Environment.GetEnvironmentVariable("TALL") == "1") sf.Height = 1900;
             int step = 0;
             var t = new System.Windows.Forms.Timer { Interval = 700 };
@@ -313,6 +319,7 @@ namespace ClassroomHud
             mf.Shown += (o, e) => t5.Start();
             Application.Run(mf);
 
+            if (Type.GetType("Mono.Runtime") != null) {
             var S4 = Sample(); S4.Memo = "오늘 준비물: 색연필, 가위\n5교시 강당 이동";
             var me = new MemoEditor(S4, 1f);
             me.Place(new Rectangle(40, 40, 420, 150), 60);
@@ -320,6 +327,8 @@ namespace ClassroomHud
             t6.Tick += (o, e) => { t6.Stop(); using (var bmp = new Bitmap(520, 300)) { using (var g = Graphics.FromImage(bmp)) g.CopyFromScreen(0, 0, 0, 0, bmp.Size); bmp.Save(dir + "/memo_inline.png", ImageFormat.Png); } me.Close(); };
             me.Shown += (o, e) => t6.Start();
             Application.Run(me);
+            }
+            }
 
             var cpf = new ColorPicker(Color.FromArgb(255, 138, 31)) { StartPosition = FormStartPosition.Manual, Location = new Point(0, 0) };
             var t4 = new System.Windows.Forms.Timer { Interval = 900 };
@@ -349,7 +358,7 @@ namespace ClassroomHud
             float K = 2f;
             var t = new DateTime(2026, 10, 8, 9, 45, 52);
             var work = new Rectangle(0, 0, 1800, 1400);
-            Func<Settings> def = () => { var s = Settings.Defaults(); s.FontName = "MemomentKkukkukk"; s.Tools = new List<string> { "msgs", "pick", "memo", "week", "music", "noise", "meal", "vote" }; s.NewToolsAdded = true; s.MusicToolAdded = true; return s; };
+            Func<Settings> def = () => { var s = Settings.Defaults(); s.Tools = new List<string> { "msgs", "pick", "memo", "week", "music", "noise", "meal", "vote" }; s.NewToolsAdded = true; s.MusicToolAdded = true; return s; };
             Action<string, Settings, HudState, DateTime> one = (name, S, st, now) =>
             {
                 var c = Painter.Compose(S, st, now, K, 900, 300, work);
@@ -378,6 +387,13 @@ namespace ClassroomHud
                 using (var b = new SolidBrush(Color.FromArgb(255, 200, 80))) g.FillEllipse(b, 138, 40, 24, 30);
             }
             one("hud_bday", def(), new HudState { BannerLabel = "생일 축하해요", BannerText = "오늘은 3번 박서연의 생일이에요!", BannerImage = pic, BannerUntil = t.AddSeconds(30) }, new DateTime(2026, 10, 8, 8, 30, 5));
+            one("hud_break", def(), new HudState { BannerLabel = "쉬는 시간이에요", BannerText = "", BannerUntil = t.AddSeconds(6) }, new DateTime(2026, 10, 8, 9, 40, 1));
+            {
+                var Sb = Sample(); var bds = new[] { "11-03", "11-12", "11-12", "11-20", "11-27", "03-05", "11-09" };
+                for (int i = 0; i < bds.Length && i < Sb.Students.Count; i++) Sb.Students[i].Birthday = bds[i];
+                var cal = new BirthdayCalendar(Sb) { Size = new Size(900, 640) }; cal.Month = new DateTime(2026, 11, 1);
+                using (var bmp = new Bitmap(900, 640)) { cal.DrawToBitmap(bmp, new Rectangle(0, 0, 900, 640)); bmp.Save(dir + "/bday_cal.png", ImageFormat.Png); }
+            }
             var S3 = def(); S3.Memo = "오늘 준비물: 색연필, 가위\n5교시 강당 이동"; S3.MemoBgOn = true; S3.MemoBgColor = "#FFD3E0";
             one("hud_memo", S3, new HudState { Hover = true }, t);
             int ti = 0;
@@ -406,6 +422,34 @@ namespace ClassroomHud
                     bmp.Save(dir + "/noise_" + i + ".png", ImageFormat.Png);
                 }
             }
+        }
+
+        public static void GuideShotsPublic(string dir) { GuideShots(dir); }
+        public static bool ShotsTailOnly;
+        public static void ShotsPublic(string dir) { Shots(dir); }
+
+        public static void VoteShots(string dir)
+        {
+            var vf = new VoteForm(Sample(), 1f) { StartPosition = FormStartPosition.Manual, Location = new Point(0, 0) };
+            var fReady = typeof(VoteForm).GetField("ready", BindingFlags.NonPublic | BindingFlags.Instance);
+            var mRun = typeof(VoteForm).GetMethod("Run", BindingFlags.NonPublic | BindingFlags.Instance);
+            Action<string> run = js => mRun.Invoke(vf, new object[] { js });
+            int step = 0, wait = 0;
+            var t = new System.Windows.Forms.Timer { Interval = 300 };
+            t.Tick += (o, e) =>
+            {
+                if (step == 0) { if (!(bool)fReady.GetValue(vf) && ++wait < 100) return; step = 1; wait = 0;
+                    run("document.getElementById('q').value='오늘 체육 시간에 뭐 할까?';var b=[].slice.call(document.querySelectorAll('[data-ex]'));b.length&&b[0].click();"); return; }
+                if (++wait < 5) return; wait = 0;
+                if (step == 1) { Grab(vf, dir + "/vote_setup.png");
+                    run("showVote('https://dpfkadpfka.github.io/RamClock/v/?c=demo&id=demo01','오늘 체육 시간에 뭐 할까?','c',['피구','줄넘기','술래잡기','발야구']);setResults([9,3,7,5],24);"); }
+                else if (step == 2) { Grab(vf, dir + "/vote_live.png");
+                    run("showVote('https://dpfkadpfka.github.io/RamClock/v/?c=demo&id=demo02','우리 반 가을 소풍 때 하고 싶은 놀이는?','t',[]);setTexts(['보물찾기 하고 싶어요','돗자리 펴고 다 같이 도시락 먹기','수건돌리기!','낙엽 모아서 그림 만들기','이어달리기 시합','사진 많이 찍기']);"); }
+                else if (step == 3) { Grab(vf, dir + "/vote_text.png"); t.Stop(); vf.Close(); return; }
+                step++;
+            };
+            vf.Shown += (o, e) => t.Start();
+            Application.Run(vf);
         }
 
         static int testTop = 30;

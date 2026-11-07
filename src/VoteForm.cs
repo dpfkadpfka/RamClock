@@ -152,6 +152,7 @@ namespace ClassroomHud
 
         protected override void OnFormClosed(FormClosedEventArgs e) { gen++; base.OnFormClosed(e); }
 
+        public static string DumpPage(Settings s) { var v = (VoteForm)System.Runtime.Serialization.FormatterServices.GetUninitializedObject(typeof(VoteForm)); typeof(VoteForm).GetField("S", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance).SetValue(v, s); return v.Page(); }
         string Page()
         {
             return @"<!doctype html><html><head><meta charset='utf-8'><style>

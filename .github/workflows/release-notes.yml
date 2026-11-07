@@ -1,0 +1,18 @@
+# CHANGELOG.md가 바뀌면 이미 나간 릴리스의 제목·설명도 CHANGELOG 내용으로 맞춘다
+name: 릴리스 설명 맞추기
+on:
+  push:
+    branches: [main]
+    paths: ['CHANGELOG.md']
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  notes:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: 모든 릴리스 설명 고치기
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python3 .github/scripts/release_notes.py --all

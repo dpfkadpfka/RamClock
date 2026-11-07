@@ -37,4 +37,6 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           V="v${{ steps.ver.outputs.v }}"
-          gh release create "$V" RamClock.exe --target "$GITHUB_SHA" --title "RamClock $V" --notes "RamClock $V — 받아서 실행하면 돼요. 이미 쓰고 있다면 자동으로 업데이트돼요."
+          # 제목·설명은 CHANGELOG.md의 "## vX.Y.Z · 제목" 칸에서 가져온다
+          python3 .github/scripts/release_notes.py "$V"
+          gh release create "$V" RamClock.exe --target "$GITHUB_SHA" --title "$(cat title.txt)" --notes-file notes.md
