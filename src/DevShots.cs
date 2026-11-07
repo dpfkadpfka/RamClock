@@ -37,15 +37,113 @@ namespace ClassroomHud
 
         public static void Run(string outDir, string only)
         {
+            if (only != null && only.StartsWith("agent"))
+            {
+                // 다운로드\RamClock 캡처 작업\cmd.txt 에 모드 이름을 적으면 그 모드를 실행 (1시간)
+                string baseDir = Path.GetDirectoryName(outDir), cmdPath = Path.Combine(baseDir, "cmd.txt");
+                Directory.CreateDirectory(outDir + "_agent"); File.WriteAllText(Path.Combine(outDir + "_agent", "alive.txt"), DateTime.Now.ToString());
+                var end = DateTime.Now.AddHours(1);
+                while (DateTime.Now < end)
+                {
+                    Thread.Sleep(1000);
+                    if (!File.Exists(cmdPath)) continue;
+                    string c; try { c = File.ReadAllText(cmdPath).Trim(); File.Delete(cmdPath); } catch { continue; }
+                    if (c == "quit") break;
+                    try { Run(outDir, c); } catch (Exception ex) { File.AppendAllText(Path.Combine(outDir + "_agent", "err.txt"), ex + "\r\n"); }
+                }
+                return;
+            }
             if (!string.IsNullOrEmpty(only)) outDir += "_" + only;
             dir = outDir; Directory.CreateDirectory(dir); logPath = Path.Combine(dir, "log.txt");
             Application.EnableVisualStyles();
-            foreach (var p in Process.GetProcesses())
+            if (only != "ss3") foreach (var p in Process.GetProcesses())
                 try { if (p.ProcessName.StartsWith("RamClockShots", StringComparison.OrdinalIgnoreCase) && p.Id != Process.GetCurrentProcess().Id) p.Kill(); } catch { }
             if (string.IsNullOrEmpty(only) || only == "real" || only == "b2") Step("real", RealWidget);
             if (string.IsNullOrEmpty(only) || only == "guide") Step("guide", () => { Directory.CreateDirectory(Path.Combine(dir, "w")); Program.GuideShotsPublic(Path.Combine(dir, "w")); });
             if (string.IsNullOrEmpty(only) || only == "vote") Step("vote", Vote);
             if (string.IsNullOrEmpty(only) || only == "forms") Step("forms", () => { Directory.CreateDirectory(Path.Combine(dir, "f")); Program.ShotsPublic(Path.Combine(dir, "f")); });
+            if (only == "final")
+            {
+                Step("hover2", () => {
+                    var me = Process.GetCurrentProcess().Id; var pids = new HashSet<uint>();
+                    foreach (var p in Process.GetProcessesByName("RamClock")) if (p.Id != me) pids.Add((uint)p.Id);
+                    var ws = Windows((pid, t) => pids.Contains(pid));
+                    ws.Sort((a, b) => (b.Value.Width * b.Value.Height).CompareTo(a.Value.Width * a.Value.Height));
+                    var r = ws[0].Value; SetCursorPos(r.X + r.Width / 2, r.Y + r.Height / 2); Thread.Sleep(1800);
+                    ws = Windows((pid, t) => pids.Contains(pid));
+                    var u = Rectangle.Empty; foreach (var w in ws) if (w.Value.IntersectsWith(Rectangle.Inflate(r, 200, 200))) u = u.IsEmpty ? w.Value : Rectangle.Union(u, w.Value);
+                    L("hover union " + u);
+                    Save(Cap(Rectangle.Intersect(Screen.FromRectangle(r).Bounds, Rectangle.Inflate(u, 30, 30))), "real_hover2");
+                    var sc = Screen.FromRectangle(r).Bounds; SetCursorPos(sc.Right - 5, sc.Bottom - 200);
+                });
+                Step("github", () => {
+                    Process.Start(new ProcessStartInfo("https://github.com/dpfkadpfka/RamClock/releases/latest#:~:text=RamClock.exe") { UseShellExecute = true });
+                    Thread.Sleep(9000);
+                    var ws = Windows((pid, t) => t.Contains("RamClock") && t.Contains("Chrome") && (t.Contains("릴리스") || t.Contains("출시") || t.Contains("Release")));
+                    L("gh windows " + ws.Count);
+                    if (ws.Count == 0) return;
+                    SetForegroundWindow(ws[0].Key); Thread.Sleep(1500);
+                    RECT r; GetWindowRect(ws[0].Key, out r); var rr = Rectangle.Intersect(Screen.FromHandle(ws[0].Key).Bounds, Rectangle.FromLTRB(r.L, r.T, r.R, r.B));
+                    L("gh " + rr); Save(Cap(rr), "github");
+                });
+                Step("warn", () => {
+                    string sd = Path.Combine(dir, "ss"); Directory.CreateDirectory(sd);
+                    string exe = Path.Combine(sd, "RamClock.exe");
+                    File.Copy(Application.ExecutablePath, exe, true);
+                    var h = CreateFile(exe + ":Zone.Identifier", 0x40000000, 0, IntPtr.Zero, 2, 0x80, IntPtr.Zero);
+                    var bytes = Encoding.ASCII.GetBytes("[ZoneTransfer]\r\nZoneId=3\r\nHostUrl=https://github.com/dpfkadpfka/RamClock/releases/latest/download/RamClock.exe\r\n");
+                    uint w; WriteFile(h, bytes, (uint)bytes.Length, out w, IntPtr.Zero); CloseHandle(h);
+                    new Thread(() => { try { Process.Start(new ProcessStartInfo(exe, "--noop") { UseShellExecute = true, WorkingDirectory = sd }); } catch { } }) { IsBackground = true }.Start();
+                    for (int i = 0; i < 30; i++)
+                    {
+                        Thread.Sleep(500);
+                        var ws = Windows((pid, t) => t.Contains("보안 경고") || t.Contains("PC 보호"));
+                        if (ws.Count == 0) continue;
+                        SetForegroundWindow(ws[0].Key); Thread.Sleep(1200);
+                        RECT r; GetWindowRect(ws[0].Key, out r); var rr = Rectangle.FromLTRB(r.L, r.T, r.R, r.B);
+                        L("warn " + rr); Save(Cap(rr), "warn"); Save(Cap(Rectangle.Inflate(rr, 120, 90)), "warn_ctx"); return;
+                    }
+                    L("no warn");
+                });
+                File.WriteAllText(Path.Combine(dir, "done.txt"), "ok");
+                Environment.Exit(0);
+            }
+            if (only == "gh4")
+            {
+                for (int i = 0; i < 20; i++)
+                {
+                    var all = Windows((pid, t) => t.Length > 0);
+                    var hit = all.FindAll(w => { var sb = new StringBuilder(256); GetWindowText(w.Key, sb, 256); return sb.ToString().Contains("릴리스 캡처"); });
+                    if (hit.Count > 0)
+                    {
+                        var h = hit[0].Key; ShowWindow(h, 6); Thread.Sleep(400); ShowWindow(h, 9); SetForegroundWindow(h); Thread.Sleep(2500);
+                        RECT r; GetWindowRect(h, out r); var rr = Rectangle.FromLTRB(r.L, r.T, r.R, r.B);
+                        rr = Rectangle.Intersect(Screen.FromRectangle(rr).Bounds, rr); L("gh " + rr); Save(Cap(rr), "github"); break;
+                    }
+                    if (i == 19) foreach (var w in all) { var sb = new StringBuilder(256); GetWindowText(w.Key, sb, 256); L("title " + sb); }
+                    Thread.Sleep(1500);
+                }
+                File.WriteAllText(Path.Combine(dir, "done.txt"), "ok"); return;
+            }
+            if (only == "ss3")
+            {
+                Thread.Sleep(4000);
+                Step("warn", () => {
+                    var ws = Windows((pid, t) => t.Contains("보안 경고") || t.Contains("PC 보호"));
+                    L("warn windows " + ws.Count);
+                    int k = 0; foreach (var w in ws) { L("warn " + w.Value); Save(Cap(w.Value), "warn_" + k++); }
+                });
+                Step("gh3", () => {
+                    var ws = Windows((pid, t) => t.Contains("릴리스 캡처"));
+                    if (ws.Count == 0) { L("no gh"); return; }
+                    var h = ws[0].Key; ShowWindow(h, 6); Thread.Sleep(400); ShowWindow(h, 9); SetForegroundWindow(h); Thread.Sleep(2000);
+                    RECT r; GetWindowRect(h, out r); var rr = Rectangle.FromLTRB(r.L, r.T, r.R, r.B);
+                    rr = Rectangle.Intersect(Screen.FromRectangle(rr).Bounds, rr); L("gh " + rr); Save(Cap(rr), "github");
+                });
+                foreach (var p in Process.GetProcesses())
+                    try { if (p.ProcessName.StartsWith("RamClockShots", StringComparison.OrdinalIgnoreCase) && p.Id != Process.GetCurrentProcess().Id) p.Kill(); } catch { }
+                File.WriteAllText(Path.Combine(dir, "done.txt"), "ok"); return;
+            }
             if (only == "ss2") { Step("gh2", Gh2); Step("smartscreen", SmartScreen); File.WriteAllText(Path.Combine(dir, "done.txt"), "ok"); return; }
             if (only == "tail" || only == "b2") Step("tail", () => { Directory.CreateDirectory(Path.Combine(dir, "f")); Program.ShotsTailOnly = true; Program.ShotsPublic(Path.Combine(dir, "f")); });
             if (string.IsNullOrEmpty(only) || only == "github" || only == "b2") Step("github", GitHub);
