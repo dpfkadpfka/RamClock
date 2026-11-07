@@ -394,10 +394,11 @@ namespace ClassroomHud
         }
 
         // ---------- 쉬는 시간 알림 소리 (여러 가지 중 고르기) ----------
+        // 학교 종(미 도 레 솔 · 솔 레 미 도)을 여러 가지 소리로
         public static readonly string[][] BreakSounds = {
-            new[] { "bell", "학교 종 (딩동댕동)" }, new[] { "marimba", "실로폰 (도미솔도)" }, new[] { "musicbox", "오르골" },
-            new[] { "8bit", "8비트 게임" }, new[] { "chime", "맑은 차임벨" }, new[] { "bird", "새소리 (짹짹)" },
-            new[] { "kpop", "케이팝 비트" }, new[] { "lofi", "로파이 (잔잔한 비트)" }, new[] { "bounce", "통통 마림바 비트" }, new[] { "synth", "신스팝 아르페지오" } };
+            new[] { "bell", "학교 종 (기본)" }, new[] { "bell_short", "학교 종 짧게 (딩동댕동)" }, new[] { "bell_big", "학교 종 큰 종 (낮고 웅장하게)" },
+            new[] { "bell_xylo", "학교 종 실로폰" }, new[] { "bell_box", "학교 종 오르골" }, new[] { "bell_piano", "학교 종 피아노" },
+            new[] { "bell_chime", "학교 종 맑은 차임" }, new[] { "bell_8bit", "학교 종 8비트 게임" }, new[] { "bell_hand", "옛날 손종 (땡땡땡)" } };
         static readonly System.Collections.Generic.Dictionary<string, SoundPlayer> breakCache = new System.Collections.Generic.Dictionary<string, SoundPlayer>();
 
         // id: 위 목록의 이름, 또는 "file:미디어 파일 이름"
@@ -458,56 +459,44 @@ namespace ClassroomHud
             }
         }
 
+        // 학교 종 멜로디를 정해진 소리로 (count: 4 또는 8음, gap: 음 사이 초, shift: 반음 올리기/내리기)
+        static double[] SchoolBell(int rate, int[] tune, int count, double gap, int shift, string kind, double lastLen)
+        {
+            double half = count > 4 ? gap * 0.6 : 0;   // 4음 다음 잠깐 쉬기
+            var smp = new double[(int)(rate * (gap * count + half + lastLen + 0.6))];
+            for (int i = 0; i < count; i++)
+            {
+                double st = i * gap + (i >= 4 ? half : 0), len = i == count - 1 ? lastLen : (kind == "sq" ? gap * 0.85 : Math.Max(gap * 2.5, 0.9));
+                int m = tune[i] + shift;
+                if (kind == "rhodes" || kind == "pluck" || kind == "bass" || kind == "saw") Syn(smp, rate, m, st, len, kind, 0.3);
+                else Note(smp, rate, Hz(m), st, len, kind, kind == "sq" ? 0.18 : 0.22);
+            }
+            return smp;
+        }
+
         static double[] BreakWave(string id)
         {
             int rate = 22050;
             double[] smp;
+            int[] tune = { 76, 72, 74, 67, 67, 74, 76, 72 };   // 미 도 레 솔 · 솔 레 미 도
             switch (id)
             {
-                case "marimba":
-                    smp = new double[(int)(rate * 1.8)];
-                    { int[] m = { 72, 76, 79, 84 }; for (int i = 0; i < 4; i++) Note(smp, rate, Hz(m[i]), i * 0.16, 1.2, "mar", 0.32); Note(smp, rate, Hz(88), 0.64, 1.1, "mar", 0.18); }
+                case "bell_short": smp = SchoolBell(rate, tune, 4, 0.5, 0, "bell", 1.8); break;
+                case "bell_big": smp = SchoolBell(rate, tune, 8, 0.62, -12, "bell", 3.0); break;
+                case "bell_xylo": smp = SchoolBell(rate, tune, 8, 0.34, 0, "mar", 1.0); break;
+                case "bell_box": smp = SchoolBell(rate, tune, 8, 0.36, 12, "box", 1.4); break;
+                case "bell_piano": smp = SchoolBell(rate, tune, 8, 0.42, 0, "rhodes", 1.6); break;
+                case "bell_chime": smp = SchoolBell(rate, tune, 8, 0.48, 12, "sine", 2.2); break;
+                case "bell_8bit": smp = SchoolBell(rate, tune, 8, 0.24, 0, "sq", 0.22); break;
+                case "bell_hand":   // 손으로 흔드는 옛날 종: 같은 높이로 땡땡땡
+                    smp = new double[(int)(rate * 3.2)];
+                    for (int i = 0; i < 8; i++) { double st = i * 0.28 + (i >= 4 ? 0.3 : 0); Note(smp, rate, Hz(84) * (1 + 0.004 * (i % 2)), st, 1.4, "bell", 0.25); }
                     break;
-                case "musicbox":
-                    smp = new double[(int)(rate * 2.6)];
-                    { int[] m = { 84, 79, 76, 79, 84, 88, 91 }; double[] at = { 0, 0.22, 0.44, 0.66, 0.88, 1.1, 1.32 }; for (int i = 0; i < m.Length; i++) Note(smp, rate, Hz(m[i]), at[i], 1.2, "box", 0.22); }
-                    break;
-                case "8bit":
-                    smp = new double[(int)(rate * 1.2)];
-                    { int[] m = { 72, 76, 79, 84, 79, 84 }; double[] at = { 0, 0.09, 0.18, 0.27, 0.40, 0.49 }; double[] ln = { 0.08, 0.08, 0.08, 0.12, 0.08, 0.45 }; for (int i = 0; i < m.Length; i++) Note(smp, rate, Hz(m[i]), at[i], ln[i], "sq", 0.16); }
-                    break;
-                case "chime":
-                    smp = new double[(int)(rate * 3.0)];
-                    { int[] m = { 81, 77, 74 }; for (int i = 0; i < 3; i++) Note(smp, rate, Hz(m[i]), i * 0.55, 2.2, "sine", 0.3); }
-                    break;
-                case "bird":
-                    smp = new double[(int)(rate * 1.6)];
-                    for (int k = 0; k < 2; k++)
-                        for (int c = 0; c < 3; c++)
-                        {
-                            double st = k * 0.75 + c * 0.13, ln = 0.09;
-                            int a = (int)(st * rate), b = Math.Min(smp.Length, (int)((st + ln) * rate)); double ph = 0;
-                            for (int i = a; i < b; i++)
-                            {
-                                double t = (i - a) / (double)rate, u = t / ln;
-                                double f = 3200 + 1500 * Math.Sin(Math.PI * u) + 300 * Math.Sin(2 * Math.PI * 40 * t);
-                                ph += 2 * Math.PI * f / rate;
-                                smp[i] += 0.28 * Math.Sin(Math.PI * u) * Math.Sin(ph);
-                            }
-                        }
-                    break;
-                case "kpop": smp = Kpop(rate); break;
-                case "lofi": smp = Lofi(rate); break;
-                case "bounce": smp = Bounce(rate); break;
-                case "synth": smp = Synth(rate); break;
-                default:   // 학교 종: 미 도 레 솔 / 솔 레 미 도
-                    smp = new double[(int)(rate * 4.4)];
-                    { int[] m = { 76, 72, 74, 67, 67, 74, 76, 72 }; for (int i = 0; i < 8; i++) Note(smp, rate, Hz(m[i]), i * 0.42 + (i >= 4 ? 0.25 : 0), i == 7 ? 1.6 : 1.1, "bell", 0.2); }
-                    break;
+                default: smp = SchoolBell(rate, tune, 8, 0.42, 0, "bell", 1.6); break;   // 학교 종 (기본)
             }
             // 소리마다 크기를 비슷하게 맞추기 (8비트는 원래 귀에 크게 들려서 조금 작게)
             double peak = 0; foreach (var v in smp) peak = Math.Max(peak, Math.Abs(v));
-            double target = id == "8bit" ? 0.45 : 0.8;
+            double target = id.Contains("8bit") ? 0.45 : 0.8;
             if (peak > 0) for (int i = 0; i < smp.Length; i++) smp[i] *= target / peak;
             return smp;
         }
