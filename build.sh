@@ -9,6 +9,8 @@ W="-r:wv2/Microsoft.Web.WebView2.Core.dll -r:wv2/Microsoft.Web.WebView2.WinForms
 for f in wv2/*.dll; do W="$W -resource:$f,$(basename $f)"; done
 # 학생 카드 QR 그리는 스크립트
 W="$W -resource:res/qrcode.js,qrcode.js"
+# 업데이트 뒤 "바뀐 점" 알림에 쓰는 CHANGELOG
+W="$W -resource:../CHANGELOG.md,CHANGELOG.md"
 # 고를 수 있는 앱 아이콘
 for f in icons/*.png; do W="$W -resource:$f,$(basename $f)"; done
 # 뽑기 효과음

@@ -60,6 +60,7 @@ namespace ClassroomHud
             AppIcons.Apply(S.AppIcon, null); Icon = AppIcons.Now;
             try { AppIcons.RefreshAfterUpdate(S); S.Save(); } catch { }
             BuildTray();
+            ShowWhatsNew();
             EnsurePosition();
             ApplyAutoStart();
             StartProfileSync();
@@ -1147,11 +1148,33 @@ namespace ClassroomHud
             ver++; Render(true);
         }
 
+        // 업데이트로 새 버전이 처음 켜지면: 무엇이 바뀌었는지 알림
+        void ShowWhatsNew()
+        {
+            try
+            {
+                if (S.SeenVersion == Updater.Version) return;
+                bool first = string.IsNullOrEmpty(S.SeenVersion);
+                S.SeenVersion = Updater.Version; S.Save();
+                var cl = Environment.GetCommandLineArgs();
+                if (Array.IndexOf(cl, "--moved") >= 0 || (first && Array.IndexOf(cl, "--restart") < 0)) return;   // 처음 설치한 사람에게는 띄우지 않음
+                string title, body = Updater.WhatsNew(out title);
+                var t = new Timer { Interval = 4000 };
+                t.Tick += (o, e) =>
+                {
+                    t.Stop(); t.Dispose();
+                    try { tray.ShowBalloonTip(15000, "RamClock v" + Updater.Version + "로 업데이트했어요" + (string.IsNullOrEmpty(title) ? "" : " · " + title), string.IsNullOrEmpty(body) ? "새 버전으로 바뀌었어요." : body, ToolTipIcon.Info); } catch { }
+                };
+                t.Start();
+            }
+            catch (Exception ex) { Program.Log(ex); }
+        }
+
         void UpdateReady(string v)
         {
             try
             {
-                tray.ShowBalloonTip(8000, "RamClock 새 버전 " + v, "새 버전을 받아 두었어요. 쓰는 창이 없을 때 잠깐 다시 켜지며 바로 바뀌어요.", ToolTipIcon.Info);
+                tray.ShowBalloonTip(10000, "RamClock 새 버전 v" + v + "이 나왔어요", "받아 두었어요. 수업에 방해되지 않게, 쓰는 창이 없을 때 잠깐 다시 켜지며 바뀌어요.\n바로 바꾸려면 이 아이콘을 오른쪽 클릭 → [지금 업데이트]", ToolTipIcon.Info);
                 StartAutoApply();
                 foreach (ToolStripItem it in tray.ContextMenuStrip.Items) if (it.Text != null && it.Text.StartsWith("지금 업데이트")) return;
                 var mi = new ToolStripMenuItem("지금 업데이트 (v" + v + ")", null, (s, e) => { Updater.Restart(); ExitApp(); }) { Font = new Font(menu.Font, FontStyle.Bold) };

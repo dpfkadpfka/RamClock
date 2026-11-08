@@ -12,7 +12,7 @@ namespace ClassroomHud
     public static class Updater
     {
         public const string Repo = "dpfkadpfka/RamClock";
-        public const string Version = "1.0.48";   // 릴리스 때 태그 번호로 바뀜
+        public const string Version = "1.0.49";   // 릴리스 때 태그 번호로 바뀜
         public static Action<string> Ready;      // 새 버전 받아 둠 → 알림
 
         static string Exe { get { return Application.ExecutablePath; } }
@@ -30,7 +30,7 @@ namespace ClassroomHud
                 {
                     try { Check(); } catch (Exception ex) { Program.Log(ex); }
                     if (Pending != null) return;
-                    Thread.Sleep(TimeSpan.FromHours(6));
+                    Thread.Sleep(TimeSpan.FromMinutes(30));   // 30분마다 (릴리스 주소만 보는 거라 가벼움)
                 }
             }) { IsBackground = true };
             t.Start();
@@ -128,6 +128,31 @@ namespace ClassroomHud
                 }
             }
             catch (Exception ex) { Program.Log(ex); return null; }
+        }
+
+        // 이 버전에서 바뀐 점 (exe 안에 넣은 CHANGELOG.md의 "## vX.Y.Z · 제목" 칸)
+        public static string WhatsNew(out string title)
+        {
+            title = null;
+            try
+            {
+                string txt;
+                using (var st = typeof(Updater).Assembly.GetManifestResourceStream("CHANGELOG.md"))
+                using (var rd = new StreamReader(st, System.Text.Encoding.UTF8)) txt = rd.ReadToEnd();
+                var m = Regex.Match(txt, @"## v" + Regex.Escape(Version) + @"\s*·\s*([^\r\n]+)([\s\S]*?)(?=\n## v|$)");
+                if (!m.Success) return null;
+                title = m.Groups[1].Value.Trim();
+                var lines = new System.Collections.Generic.List<string>();
+                foreach (Match b in Regex.Matches(m.Groups[2].Value, @"^- (.+)$", RegexOptions.Multiline))
+                {
+                    string l = Regex.Replace(b.Groups[1].Value, @"[*`]", "").Trim();
+                    if (l.Length > 70) l = l.Substring(0, 68) + "…";
+                    lines.Add("· " + l);
+                    if (lines.Count == 3) break;
+                }
+                return string.Join("\n", lines);
+            }
+            catch { return null; }
         }
 
         // 바로 새 버전으로 다시 켜기

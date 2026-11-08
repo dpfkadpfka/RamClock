@@ -131,7 +131,8 @@ namespace ClassroomHud
         public bool TopMostOn { get; set; } = true;
         public bool AutoStart { get; set; }
         public int AppIcon { get; set; } = 1;
-        public int IconVer { get; set; }               // 아이콘 새로 고침 표시          // 앱 아이콘 1~6 (AppIcons)
+        public int IconVer { get; set; }
+        public string SeenVersion { get; set; }         // 바뀐 점 알림을 보여 준 버전               // 아이콘 새로 고침 표시          // 앱 아이콘 1~6 (AppIcons)
         public string FontName { get; set; } = "★ 주아";
         public bool DigitFont { get; set; } = true;   // true = 글꼴 숫자, false = 디지털(7칸) 숫자
         public int BannerSeconds { get; set; } = 10;
