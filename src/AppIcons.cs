@@ -81,16 +81,15 @@ namespace ClassroomHud
         // 창마다 붙이는 아이콘
         public static Icon Now { get { return Get(current); } }
 
-        // 바로가기에 쓸 .ico 파일 (1번은 exe 자체)
+        // 바로가기에 쓸 .ico 파일 (새 경로라 윈도우 아이콘 캐시에 남은 옛 그림 대신 새 그림을 읽음)
         public static string IconLocation(int n)
         {
             n = Clamp(n);
-            if (n == 1) return Program.InstallPath + ",0";
             try
             {
                 string dir = Path.Combine(Path.GetDirectoryName(Program.InstallPath), "icons");
                 Directory.CreateDirectory(dir);
-                string p = Path.Combine(dir, "icon" + n + ".ico");
+                string p = Path.Combine(dir, "icon" + n + "_v2.ico");
                 File.WriteAllBytes(p, IcoBytes(n));
                 return p + ",0";
             }
@@ -107,6 +106,15 @@ namespace ClassroomHud
             try { if (tray != null) tray.Icon = ic; } catch { }
             foreach (Form f in Application.OpenForms) try { if (f.ShowIcon) f.Icon = ic; } catch { }
             if (changed || n != 1) Program.UpdateShortcutIcons(IconLocation(n));
+        }
+
+        // 새 버전으로 아이콘 그림이 바뀌었을 때 한 번: 바로가기·작업 표시줄 고정 아이콘을 다시 읽게 함
+        public static void RefreshAfterUpdate(Settings S)
+        {
+            const int Ver = 2;
+            if (S.IconVer >= Ver) return;
+            S.IconVer = Ver;
+            Program.UpdateShortcutIcons(IconLocation(current), true);
         }
     }
 }

@@ -58,6 +58,7 @@ namespace ClassroomHud
             Audio.Init();
             Audio.ApplyVoice(S.VoiceName, S.VoiceRate, S.VoiceVolume);
             AppIcons.Apply(S.AppIcon, null); Icon = AppIcons.Now;
+            try { AppIcons.RefreshAfterUpdate(S); S.Save(); } catch { }
             BuildTray();
             EnsurePosition();
             ApplyAutoStart();

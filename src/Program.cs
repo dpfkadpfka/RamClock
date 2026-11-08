@@ -167,7 +167,8 @@ namespace ClassroomHud
         [DllImport("shell32.dll")] static extern void SHChangeNotify(int e, int f, IntPtr a, IntPtr b);
 
         // 설정에서 앱 아이콘을 바꾸면 바탕화면·시작 메뉴 바로가기 아이콘도 바꾼다
-        public static void UpdateShortcutIcons(string iconLocation)
+        public static void UpdateShortcutIcons(string iconLocation) { UpdateShortcutIcons(iconLocation, false); }
+        public static void UpdateShortcutIcons(string iconLocation, bool force)
         {
             if (Type.GetType("Mono.Runtime") != null) return;
             try
@@ -175,15 +176,19 @@ namespace ClassroomHud
                 var shellType = Type.GetTypeFromProgID("WScript.Shell");
                 if (shellType == null) return;
                 dynamic shell = Activator.CreateInstance(shellType);
+                // 바탕화면 · 시작 메뉴 · 작업 표시줄에 고정한 바로가기
+                string pinned = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), @"Microsoft\Internet Explorer\Quick Launch\User Pinned\TaskBar");
+                var lnks = new List<string>();
                 foreach (var folder in new[] { Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory), Environment.GetFolderPath(Environment.SpecialFolder.Programs) })
+                    if (!string.IsNullOrEmpty(folder)) lnks.Add(System.IO.Path.Combine(folder, "RamClock.lnk"));
+                try { if (System.IO.Directory.Exists(pinned)) lnks.AddRange(System.IO.Directory.GetFiles(pinned, "*.lnk")); } catch { }
+                foreach (var lnk in lnks)
                 {
-                    if (string.IsNullOrEmpty(folder)) continue;
-                    string lnk = System.IO.Path.Combine(folder, "RamClock.lnk");
                     if (!System.IO.File.Exists(lnk)) continue;
                     dynamic sc = shell.CreateShortcut(lnk);
                     string t = (string)sc.TargetPath;
                     if (!string.Equals(t, InstallPath, StringComparison.OrdinalIgnoreCase) && !string.Equals(t, Application.ExecutablePath, StringComparison.OrdinalIgnoreCase)) continue;
-                    if (string.Equals((string)sc.IconLocation, iconLocation, StringComparison.OrdinalIgnoreCase)) continue;
+                    if (!force && string.Equals((string)sc.IconLocation, iconLocation, StringComparison.OrdinalIgnoreCase)) continue;
                     sc.IconLocation = iconLocation;
                     sc.Save();
                 }
