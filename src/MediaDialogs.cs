@@ -252,7 +252,7 @@ namespace ClassroomHud
             StartPosition = System.Windows.Forms.FormStartPosition.CenterScreen;
             ClientSize = new System.Drawing.Size(600, 680);
             Padding = new System.Windows.Forms.Padding(12);
-            try { Icon = System.Drawing.Icon.ExtractAssociatedIcon(System.Windows.Forms.Application.ExecutablePath); } catch { }
+            try { Icon = AppIcons.Now; } catch { }
 
             var card = new GlassPanel { Dock = System.Windows.Forms.DockStyle.Fill, Padding = new System.Windows.Forms.Padding(18, 14, 18, 14), Alpha = 140 };
             var t = new System.Windows.Forms.TableLayoutPanel { Dock = System.Windows.Forms.DockStyle.Fill, ColumnCount = 1, BackColor = System.Drawing.Color.Transparent };

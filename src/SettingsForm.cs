@@ -10,6 +10,7 @@ namespace ClassroomHud
 {
     public class SettingsForm : GlassForm
     {
+        int iconSel = 1;
         public Settings R;
         NavBar nav; Panel content; readonly List<Panel> pages = new List<Panel>(); readonly List<string> titles = new List<string>(); int curPage = -1; bool navLock;
         PaintBox preview; Bitmap previewBmp; ComboBox cbBack; Timer previewTimer; FlowLayoutPanel themeFlow;
@@ -61,7 +62,7 @@ namespace ClassroomHud
             MinimumSize = new Size(820, 560);
             BackColor = Ui.Bg;
             ShowInTaskbar = true;
-            try { Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath); } catch { }
+            try { Icon = AppIcons.Now; } catch { }
 
             Padding = new Padding(14, 14, 14, 0);
             nav = new NavBar { Dock = DockStyle.Fill, ItemHeight = 48 };
@@ -396,7 +397,32 @@ namespace ClassroomHud
                 { R = Settings.Defaults(); DialogResult = DialogResult.OK; Close(); }
             };
             rf.Controls.AddRange(new Control[] { bPos, bAll, lPosNote });
-            p.Controls.Add(Card(Sec("기타"), vf, tf, tf2, rf, new Label { Text = "저장 위치: " + Settings.Dir, AutoSize = true, ForeColor = Ui.Muted, MaximumSize = new Size(460, 0), Margin = new Padding(2, 8, 0, 0) }));
+            // 앱 아이콘 고르기 (트레이·창·바탕화면 바로가기)
+            iconSel = R.AppIcon < 1 || R.AppIcon > AppIcons.Count ? 1 : R.AppIcon;
+            var icRow = Row();
+            icRow.Controls.Add(Cap("앱 아이콘"));
+            var icBtns = new List<Panel>();
+            for (int i = 1; i <= AppIcons.Count; i++)
+            {
+                int n = i; var pic = AppIcons.Picture(n);
+                var pb = new Panel { Width = 50, Height = 50, Margin = new Padding(0, 2, 6, 2), Cursor = Cursors.Hand, BackColor = Color.Transparent };
+                pb.Paint += (o, e) =>
+                {
+                    var g = e.Graphics; g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+                    g.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.HighQualityBicubic;
+                    var r = new RectangleF(1.5f, 1.5f, pb.Width - 3, pb.Height - 3);
+                    using (var path = Ui.Round(r, 10))
+                    {
+                        using (var br = new SolidBrush(iconSel == n ? Color.FromArgb(255, 232, 241) : Color.FromArgb(200, 255, 255, 255))) g.FillPath(br, path);
+                        using (var pen = new Pen(iconSel == n ? Color.FromArgb(255, 95, 162) : Color.FromArgb(225, 225, 235), iconSel == n ? 2.5f : 1f)) g.DrawPath(pen, path);
+                    }
+                    if (pic != null) g.DrawImage(pic, 7, 7, pb.Width - 14, pb.Height - 14);
+                };
+                pb.Click += (o, e) => { iconSel = n; foreach (var x in icBtns) x.Invalidate(); };
+                try { new ToolTip().SetToolTip(pb, AppIcons.Names[n - 1]); } catch { }
+                icBtns.Add(pb); icRow.Controls.Add(pb);
+            }
+            p.Controls.Add(Card(Sec("기타"), vf, icRow, tf, tf2, rf, new Label { Text = "저장 위치: " + Settings.Dir, AutoSize = true, ForeColor = Ui.Muted, MaximumSize = new Size(460, 0), Margin = new Padding(2, 8, 0, 0) }));
 
             // 오른쪽 미리보기
             var right = new GlassPanel { Dock = DockStyle.Fill, Padding = new Padding(14), Margin = new Padding(10, 0, 0, 0), Alpha = 135 };
@@ -643,7 +669,7 @@ namespace ClassroomHud
         {
             Changed();
             R.TopMostOn = chkTop.Checked; R.ShowDate = chkDate.Checked; R.ShowStatus = chkStatus.Checked;
-            R.Locked = chkLocked.Checked; R.AutoStart = chkAuto.Checked;
+            R.Locked = chkLocked.Checked; R.AutoStart = chkAuto.Checked; R.AppIcon = iconSel;
             R.BannerSeconds = (int)nBanner.Value;
             var list = new List<int>();
             foreach (var part in txtPresets.Text.Split(new[] { ',', ' ', '/' }, StringSplitOptions.RemoveEmptyEntries))

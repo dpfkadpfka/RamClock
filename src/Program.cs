@@ -164,6 +164,34 @@ namespace ClassroomHud
             }) { IsBackground = true }.Start();
         }
 
+        [DllImport("shell32.dll")] static extern void SHChangeNotify(int e, int f, IntPtr a, IntPtr b);
+
+        // 설정에서 앱 아이콘을 바꾸면 바탕화면·시작 메뉴 바로가기 아이콘도 바꾼다
+        public static void UpdateShortcutIcons(string iconLocation)
+        {
+            if (Type.GetType("Mono.Runtime") != null) return;
+            try
+            {
+                var shellType = Type.GetTypeFromProgID("WScript.Shell");
+                if (shellType == null) return;
+                dynamic shell = Activator.CreateInstance(shellType);
+                foreach (var folder in new[] { Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory), Environment.GetFolderPath(Environment.SpecialFolder.Programs) })
+                {
+                    if (string.IsNullOrEmpty(folder)) continue;
+                    string lnk = System.IO.Path.Combine(folder, "RamClock.lnk");
+                    if (!System.IO.File.Exists(lnk)) continue;
+                    dynamic sc = shell.CreateShortcut(lnk);
+                    string t = (string)sc.TargetPath;
+                    if (!string.Equals(t, InstallPath, StringComparison.OrdinalIgnoreCase) && !string.Equals(t, Application.ExecutablePath, StringComparison.OrdinalIgnoreCase)) continue;
+                    if (string.Equals((string)sc.IconLocation, iconLocation, StringComparison.OrdinalIgnoreCase)) continue;
+                    sc.IconLocation = iconLocation;
+                    sc.Save();
+                }
+                SHChangeNotify(0x08000000, 0, IntPtr.Zero, IntPtr.Zero);   // 아이콘 새로 그리기
+            }
+            catch (Exception ex) { Log(ex); }
+        }
+
         static void MakeShortcuts(string target)
         {
             try

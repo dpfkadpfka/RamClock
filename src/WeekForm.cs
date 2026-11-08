@@ -29,7 +29,7 @@ namespace ClassroomHud
             StartPosition = FormStartPosition.CenterScreen;
             ClientSize = new Size(940, 640);
             MinimumSize = new Size(700, 480);
-            try { Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath); } catch { }
+            try { Icon = AppIcons.Now; } catch { }
 
             var t = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, Padding = new Padding(10) };
             t.RowStyles.Add(new RowStyle(SizeType.AutoSize));

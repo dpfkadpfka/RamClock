@@ -76,7 +76,7 @@ namespace ClassroomHud
             SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.UserPaint | ControlStyles.ResizeRedraw, true);
             KeyPreview = true;
             BackColor = Ui.Bg;
-            try { Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath); } catch { }
+            try { Icon = AppIcons.Now; } catch { }
             int W = (int)(screen.Width * 0.92), H = (int)(screen.Height * 0.9);
             Bounds = new Rectangle(screen.X + (screen.Width - W) / 2, screen.Y + (screen.Height - H) / 2, W, H);
 

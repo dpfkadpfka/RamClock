@@ -210,7 +210,7 @@ namespace ClassroomHud
             MinimumSize = new System.Drawing.Size(560, 480);
             TopMost = true;
             BackColor = Ui.Bg;
-            try { Icon = System.Drawing.Icon.ExtractAssociatedIcon(System.Windows.Forms.Application.ExecutablePath); } catch { }
+            try { Icon = AppIcons.Now; } catch { }
 
             var top = new System.Windows.Forms.Panel { Dock = System.Windows.Forms.DockStyle.Top, Height = 64, Padding = new System.Windows.Forms.Padding(14, 10, 14, 6) };
             var bPrev = new System.Windows.Forms.Button { Text = "◀", Width = 48, Dock = System.Windows.Forms.DockStyle.Left };

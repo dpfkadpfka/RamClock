@@ -37,7 +37,7 @@ namespace ClassroomHud
             ClientSize = new Size((int)(1200 * k), (int)(720 * k));
             MinimumSize = new Size((int)(500 * k), (int)(420 * k));
             BackColor = Color.White;
-            try { Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath); } catch { }
+            try { Icon = AppIcons.Now; } catch { }
             web = new WebView2 { Dock = DockStyle.Fill, DefaultBackgroundColor = Color.White };
             Controls.Add(web);
             Init();

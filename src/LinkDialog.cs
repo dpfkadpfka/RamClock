@@ -27,7 +27,7 @@ namespace ClassroomHud
             StartPosition = FormStartPosition.CenterScreen;
             TopMost = true;
             ClientSize = new Size(470, 250);
-            try { Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath); } catch { }
+            try { Icon = AppIcons.Now; } catch { }
             var t = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, Padding = new Padding(16, 12, 16, 12) };
             for (int i = 0; i < 6; i++) t.RowStyles.Add(new RowStyle(SizeType.AutoSize));
             t.Controls.Add(new Label { Text = pl ? "유튜브·유튜브 뮤직 주소 (재생목록이나 영상 주소)" : "사이트 주소 (예: www.youtube.com)", AutoSize = true });

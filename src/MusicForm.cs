@@ -41,7 +41,7 @@ namespace ClassroomHud
             Padding = new Padding(Pad);
             DoubleBuffered = true;
             MinimumSize = new Size((int)(260 * k), HeadH + 2 * Pad);
-            try { Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath); } catch { }
+            try { Icon = AppIcons.Now; } catch { }
             int w = S.MusicW > 0 ? S.MusicW : (int)(420 * k), h = S.MusicH > 0 ? S.MusicH : (int)(320 * k);
             Size = new Size(w, h);
 
@@ -343,7 +343,7 @@ namespace ClassroomHud
             ClientSize = new Size(620, 420);
             MinimumSize = new Size(460, 300);
             TopMost = true;
-            try { Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath); } catch { }
+            try { Icon = AppIcons.Now; } catch { }
 
             var t = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, Padding = new Padding(14, 10, 14, 12) };
             t.RowStyles.Add(new RowStyle(SizeType.AutoSize));

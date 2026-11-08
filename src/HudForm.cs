@@ -52,11 +52,12 @@ namespace ClassroomHud
             Text = "RamClock";
             Size = new Size(1, 1);
             TopMost = S.TopMostOn;
-            try { Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath); } catch { }
+            try { Icon = AppIcons.Now; } catch { }
             using (var g = CreateGraphics()) sysK = Math.Max(1f, g.DpiX / 96f);
             dpiK = sysK;
             Audio.Init();
             Audio.ApplyVoice(S.VoiceName, S.VoiceRate, S.VoiceVolume);
+            AppIcons.Apply(S.AppIcon, null); Icon = AppIcons.Now;
             BuildTray();
             EnsurePosition();
             ApplyAutoStart();
@@ -931,6 +932,7 @@ namespace ClassroomHud
             S.Save();
             Raise();   // 설정 창이 열려 있으면 시계를 앞으로 올리지 않음
             ApplyAutoStart();
+            AppIcons.Apply(S.AppIcon, tray);
             lastSec = -1; lastDayKey = "";
             ver++; Render(true);
         }
