@@ -62,6 +62,7 @@ namespace ClassroomHud
             if (string.IsNullOrEmpty(only) || only == "guide") Step("guide", () => { Directory.CreateDirectory(Path.Combine(dir, "w")); Program.GuideShotsPublic(Path.Combine(dir, "w")); });
             if (string.IsNullOrEmpty(only) || only == "vote") Step("vote", Vote);
             if (string.IsNullOrEmpty(only) || only == "forms") Step("forms", () => { Directory.CreateDirectory(Path.Combine(dir, "f")); Program.ShotsPublic(Path.Combine(dir, "f")); });
+            if (only == "scenes") { DevScenes.Run(dir); return; }
             if (only == "final")
             {
                 Step("hover2", () => {

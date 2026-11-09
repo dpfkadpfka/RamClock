@@ -459,6 +459,7 @@ namespace ClassroomHud
 
         public static void GuideShotsPublic(string dir) { GuideShots(dir); }
         public static bool ShotsTailOnly;
+        public static Settings SampleSettings() { return Sample(); }
         public static void ShotsPublic(string dir) { Shots(dir); }
 
         public static void VoteShots(string dir)
