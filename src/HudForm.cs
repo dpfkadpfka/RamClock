@@ -47,7 +47,7 @@ namespace ClassroomHud
             LinkIcons.Updated = () => { try { if (IsHandleCreated) BeginInvoke(new Action(() => { ver++; Render(true); })); } catch { } };
             foreach (var l in S.Links) { try { LinkIcons.Get(l.Url); } catch { } }
             FormBorderStyle = FormBorderStyle.None;
-            ShowInTaskbar = true;
+            ShowInTaskbar = S.ShowInTaskbar;
             StartPosition = FormStartPosition.Manual;
             Text = "RamClock";
             Size = new Size(1, 1);
@@ -935,6 +935,7 @@ namespace ClassroomHud
             Raise();   // 설정 창이 열려 있으면 시계를 앞으로 올리지 않음
             ApplyAutoStart();
             AppIcons.Apply(S.AppIcon, tray);
+            if (ShowInTaskbar != S.ShowInTaskbar) { ShowInTaskbar = S.ShowInTaskbar; ver++; Render(true); }
             lastSec = -1; lastDayKey = "";
             ver++; Render(true);
         }
@@ -989,7 +990,8 @@ namespace ClassroomHud
         void HideToTray()
         {
             st.Hover = false; st.Popup = 0;
-            WindowState = FormWindowState.Minimized;
+            if (!S.ShowInTaskbar) Hide();   // 작업 표시줄에 없으면 최소화 대신 숨김 (트레이 아이콘으로 다시 보이기)
+            else WindowState = FormWindowState.Minimized;
             miShow.Text = "보이기";
         }
 

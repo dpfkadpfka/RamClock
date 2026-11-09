@@ -28,7 +28,7 @@ namespace ClassroomHud
         CheckBox chkVoice, chkSfx; ComboBox cbVoice; Slider slRate; DataGridView gRules, gMsgs;
         // 화면
         CheckBox chkMemoBg, chkMemoBold, chkMemoLine; Slider slMemoSize, slMemoAlpha; Swatch bMemoColor, bMemoBg, bMemoLine; ComboBox cbMemoFont;
-        CheckBox chkSec, chkTop, chkDate, chkStatus, chkReadable, chkLocked, chkAuto, chkOutline, chkShadow, chkDigitFont;
+        CheckBox chkSec, chkTop, chkDate, chkStatus, chkReadable, chkLocked, chkAuto, chkTaskbar, chkOutline, chkShadow, chkDigitFont;
         ComboBox cbFont; NumericUpDown nBanner; TextBox txtPresets; Panel colorPreview; Label lColor, lPosNote, lFontPreview;
         // 뽑기
         NumericUpDown nCount; RadioButton rbBoth, rbName, rbNo; CheckBox chkNoRepeat, chkResetStart; DataGridView gStu; Label lPicked;
@@ -376,6 +376,8 @@ namespace ClassroomHud
             chkTop = Tg("항상 다른 창 위에", R.TopMostOn); vf.Controls.Add(chkTop);
             chkLocked = Tg("잠금", R.Locked); vf.Controls.Add(chkLocked);
             chkAuto = Tg("윈도우 켤 때 자동 실행", R.AutoStart); vf.Controls.Add(chkAuto);
+            chkTaskbar = Tg("작업 표시줄에 보이기", R.ShowInTaskbar); vf.Controls.Add(chkTaskbar);
+            new ToolTip().SetToolTip(chkTaskbar, "끄면 작업 표시줄에는 안 보이고, 오른쪽 아래 트레이(^)에만 시계 아이콘이 있어요.");
             chkReadable = new CheckBox { Visible = false };
             chkDigitFont = new CheckBox { Visible = false };
             var tf = Row();
@@ -669,7 +671,7 @@ namespace ClassroomHud
         {
             Changed();
             R.TopMostOn = chkTop.Checked; R.ShowDate = chkDate.Checked; R.ShowStatus = chkStatus.Checked;
-            R.Locked = chkLocked.Checked; R.AutoStart = chkAuto.Checked; R.AppIcon = iconSel;
+            R.Locked = chkLocked.Checked; R.AutoStart = chkAuto.Checked; R.ShowInTaskbar = chkTaskbar.Checked; R.AppIcon = iconSel;
             R.BannerSeconds = (int)nBanner.Value;
             var list = new List<int>();
             foreach (var part in txtPresets.Text.Split(new[] { ',', ' ', '/' }, StringSplitOptions.RemoveEmptyEntries))

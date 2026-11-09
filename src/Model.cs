@@ -130,6 +130,7 @@ namespace ClassroomHud
         public bool ShowStatus { get; set; } = true;
         public bool TopMostOn { get; set; } = true;
         public bool AutoStart { get; set; }
+        public bool ShowInTaskbar { get; set; } = true;   // 끄면 작업 표시줄 없이 트레이에만
         public int AppIcon { get; set; } = 1;
         public int IconVer { get; set; }
         public string SeenVersion { get; set; }         // 바뀐 점 알림을 보여 준 버전               // 아이콘 새로 고침 표시          // 앱 아이콘 1~6 (AppIcons)
