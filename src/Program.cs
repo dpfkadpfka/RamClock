@@ -87,6 +87,8 @@ namespace ClassroomHud
                 {
                     try { created = m.WaitOne(10000); } catch (AbandonedMutexException) { created = true; }
                 }
+                string cmd = JumpList.CmdOf(args);
+                if (!created && cmd != null) { JumpList.Send(JumpList.Code(cmd)); return; }   // 작업 표시줄 목록에서 누른 명령: 켜져 있는 RamClock에 전달
                 if (!created)
                 {
                     MessageBox.Show("RamClock이 이미 실행 중이에요.\n작업 표시줄 오른쪽 아래 아이콘을 확인해 주세요.", "RamClock");
@@ -98,6 +100,7 @@ namespace ClassroomHud
                 Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException);
                 Application.ThreadException += (o, e) => Log(e.Exception);
                 AppDomain.CurrentDomain.UnhandledException += (o, e) => Log(e.ExceptionObject as Exception);
+                PendingCmd = JumpList.Code(cmd ?? "");
                 Application.Run(new HudForm());
                 GC.KeepAlive(m);
             }
@@ -261,6 +264,7 @@ namespace ClassroomHud
             Save(dir + "/11_builtin_hover.png", S5, st5, t, work, 1);
         }
 
+        public static int PendingCmd;   // 꺼져 있을 때 작업 표시줄 목록으로 켠 경우, 켜지자마자 할 일
         public static void Log(Exception ex)
         {
             try

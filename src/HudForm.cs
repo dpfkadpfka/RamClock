@@ -61,6 +61,7 @@ namespace ClassroomHud
             AppIcons.Apply(S.AppIcon, null); Icon = AppIcons.Now;
             try { AppIcons.RefreshAfterUpdate(S); S.Save(); } catch { }
             BuildTray();
+            { var jt = new Timer { Interval = 1500 }; jt.Tick += (o, e) => { jt.Stop(); jt.Dispose(); JumpList.Build(); if (Program.PendingCmd > 0) { int c = Program.PendingCmd; Program.PendingCmd = 0; RunCmd(c); } }; jt.Start(); }   // 작업 표시줄 목록 만들기
             ShowWhatsNew();
             EnsurePosition();
             ApplyAutoStart();
@@ -179,8 +180,28 @@ namespace ClassroomHud
             return sysK;
         }
 
+        // 작업 표시줄 목록(점프 목록)에서 고른 명령
+        void RunCmd(int code)
+        {
+            if (code <= 0 || code > JumpList.Tasks.Length) return;
+            switch (JumpList.Tasks[code - 1][0])
+            {
+                case "update": CheckUpdateNow(); break;
+                case "settings": if (!Visible) ShowFromTray(); OpenSettings(); break;
+                case "bday": BirthdayListForm.Open(S); break;
+                case "pick": OpenPicker(); break;
+            }
+        }
+
+        void CheckUpdateNow()
+        {
+            tray.ShowBalloonTip(3000, "RamClock", "새 버전이 있는지 확인하고 있어요…", ToolTipIcon.None);
+            Updater.CheckNow(m => { try { BeginInvoke(new Action(() => tray.ShowBalloonTip(6000, "RamClock 업데이트", m, ToolTipIcon.Info))); } catch { } });
+        }
+
         protected override void WndProc(ref Message m)
         {
+            if (m.Msg == JumpList.Msg && JumpList.Msg > 0) { int c = m.WParam.ToInt32(); m.Result = IntPtr.Zero; try { BeginInvoke(new Action(() => RunCmd(c))); } catch { } return; }
             if (m.Msg == 0x02E0) { ver++; m.Result = IntPtr.Zero; return; }   // 모니터 배율 바뀜: 다음 틱에 다시 그림
             base.WndProc(ref m);
         }
@@ -974,11 +995,7 @@ namespace ClassroomHud
                 S.X = int.MinValue; S.Scale = 1f; EnsurePosition(); S.Save(); if (!Visible) ShowFromTray(); ver++; Render(true);
             }));
             menu.Items.Add(new ToolStripSeparator());
-            menu.Items.Add(new ToolStripMenuItem("업데이트 확인 (지금 v" + Updater.Version + ")", null, (s, e) =>
-            {
-                tray.ShowBalloonTip(3000, "RamClock", "새 버전이 있는지 확인하고 있어요…", ToolTipIcon.None);
-                Updater.CheckNow(m => { try { BeginInvoke(new Action(() => tray.ShowBalloonTip(6000, "RamClock 업데이트", m, ToolTipIcon.Info))); } catch { } });
-            }));
+            menu.Items.Add(new ToolStripMenuItem("업데이트 확인 (지금 v" + Updater.Version + ")", null, (s, e) => CheckUpdateNow()));
             menu.Items.Add(new ToolStripMenuItem("종료", null, (s, e) => ExitApp()));
             tray = new NotifyIcon
             {
