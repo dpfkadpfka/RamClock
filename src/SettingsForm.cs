@@ -1262,7 +1262,7 @@ namespace ClassroomHud
             var bBirth = B("생일 명단 넣기…");
             bBirth.Click += (o, e) => ImportBirthdays(null);
             var bBirthList = B("생일 달력");
-            bBirthList.Click += (o, e) => { CommitPick(); using (var d = new BirthdayListForm(R)) d.ShowDialog(this); };
+            bBirthList.Click += (o, e) => { CommitPick(); BirthdayListForm.Open(R); };
             var bMore = B("더 보기 ▾");
             var more = new ContextMenuStrip();
             more.Items.Add("엑셀 서식 받기…", null, (o, e) => SaveRosterTemplate());

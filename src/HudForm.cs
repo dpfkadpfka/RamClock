@@ -44,6 +44,7 @@ namespace ClassroomHud
             Updater.Ready = v => { try { if (IsHandleCreated) BeginInvoke(new Action(() => UpdateReady(v))); } catch { } };
             Updater.Start();
             // 바로가기 로고를 미리 받아 두기
+            BirthdayListForm.Changed = () => { try { if (IsHandleCreated) BeginInvoke(new Action(() => { ver++; Render(true); })); } catch { } };
             LinkIcons.Updated = () => { try { if (IsHandleCreated) BeginInvoke(new Action(() => { ver++; Render(true); })); } catch { } };
             foreach (var l in S.Links) { try { LinkIcons.Get(l.Url); } catch { } }
             FormBorderStyle = FormBorderStyle.None;
@@ -443,6 +444,7 @@ namespace ClassroomHud
                 case "memodel": return "글 지우기";
                 case "bannerdel": return "닫기";
                 case "week": return "이번 주 — 주간 시간표 보기";
+                case "bday": return "생일 달력 — 우리 반 생일 보기";
                 case "music": return "음악 — 유튜브 미니 플레이어";
                 case "noise": return "소음 신호등 — 마이크로 교실 소리 재기";
                 case "meal": return "오늘 급식 — 점심 메뉴 보기";
@@ -520,6 +522,7 @@ namespace ClassroomHud
                 case "m2": S.Mode = 2; S.Save(); break;
                 case "pick": OpenPicker(); return;
                 case "week": OpenWeek(); return;
+                case "bday": BirthdayListForm.Toggle(S); return;
                 case "memo": OpenMemo(); return;
                 case "music": OpenMusic(null); return;
                 case "noise": ToggleNoise(); return;
@@ -916,7 +919,7 @@ namespace ClassroomHud
             if (t == null || t == S) return;
             if (t.X != int.MinValue) { t.X = S.X; t.Y = S.Y; t.Scale = S.Scale; }
             t.Mode = S.Mode;
-            t.Playlists = S.Playlists; t.MusicLast = S.MusicLast; t.MusicW = S.MusicW; t.MusicH = S.MusicH; t.MusicDX = S.MusicDX; t.MusicDY = S.MusicDY; t.MusicToolAdded = S.MusicToolAdded;
+            t.Playlists = S.Playlists; t.MusicLast = S.MusicLast; t.MusicW = S.MusicW; t.MusicH = S.MusicH; t.MusicDX = S.MusicDX; t.MusicDY = S.MusicDY; t.MusicToolAdded = S.MusicToolAdded; t.BdayToolAdded = S.BdayToolAdded;
             if (t == previewS && previewFromMemo) return;
             t.Memo = S.Memo; t.MemoRuns = S.MemoRuns; t.MemoColor = S.MemoColor; t.MemoBgOn = S.MemoBgOn; t.MemoBgColor = S.MemoBgColor; t.MemoBgOpacity = S.MemoBgOpacity;
             t.MemoFont = S.MemoFont; t.MemoSize = S.MemoSize; t.MemoBold = S.MemoBold; t.MemoOutline = S.MemoOutline; t.MemoOutlineColor = S.MemoOutlineColor;
@@ -965,7 +968,7 @@ namespace ClassroomHud
             menu.Items.Add(new ToolStripMenuItem("뽑기", null, (s, e) => OpenPicker()));
             menu.Items.Add(new ToolStripMenuItem("메모", null, (s, e) => OpenMemo()));
             menu.Items.Add(new ToolStripMenuItem("이번 주 시간표", null, (s, e) => OpenWeek()));
-            menu.Items.Add(new ToolStripMenuItem("우리 반 생일", null, (s, e) => { using (var d = new BirthdayListForm(S)) d.ShowDialog(); }));
+            menu.Items.Add(new ToolStripMenuItem("우리 반 생일", null, (s, e) => BirthdayListForm.Open(S)));
             menu.Items.Add(new ToolStripMenuItem("위치·크기 처음으로", null, (s, e) =>
             {
                 S.X = int.MinValue; S.Scale = 1f; EnsurePosition(); S.Save(); if (!Visible) ShowFromTray(); ver++; Render(true);

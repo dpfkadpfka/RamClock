@@ -198,6 +198,20 @@ namespace ClassroomHud
         readonly System.Windows.Forms.Label title;
         readonly System.Windows.Forms.Button bList;
 
+        // 따로 뜨는 창으로 열기 — 열려 있는 동안에도 시계·다른 창을 그대로 쓸 수 있게 (이미 열려 있으면 앞으로)
+        static BirthdayListForm open;
+        public static bool IsOpen { get { return open != null && !open.IsDisposed; } }
+        public static Action Changed;   // 열고 닫을 때 시계 버튼 색을 바로 바꾸게
+        public static void Toggle(Settings s) { if (IsOpen) open.Close(); else Open(s); }
+        public static void Open(Settings s)
+        {
+            if (open != null && !open.IsDisposed) { if (open.WindowState == System.Windows.Forms.FormWindowState.Minimized) open.WindowState = System.Windows.Forms.FormWindowState.Normal; open.Activate(); return; }
+            open = new BirthdayListForm(s);
+            open.FormClosed += (o, e) => { open = null; if (Changed != null) Changed(); };
+            open.Show();
+            if (Changed != null) Changed();
+        }
+
         public BirthdayListForm(Settings s)
         {
             S = s;
@@ -208,7 +222,7 @@ namespace ClassroomHud
             StartPosition = System.Windows.Forms.FormStartPosition.CenterScreen;
             ClientSize = new System.Drawing.Size(940, 720);
             MinimumSize = new System.Drawing.Size(560, 480);
-            TopMost = true;
+            ShowInTaskbar = true;
             BackColor = Ui.Bg;
             try { Icon = AppIcons.Now; } catch { }
 
@@ -341,8 +355,22 @@ namespace ClassroomHud
                         g.DrawString(wd[i], hf, b, new System.Drawing.RectangleF(area.X + i * cw, area.Y, cw, headH), new System.Drawing.StringFormat { Alignment = System.Drawing.StringAlignment.Center, LineAlignment = System.Drawing.StringAlignment.Center });
                 }
 
+            // 이름은 칸에 들어가는 만큼 크게 (가장 긴 이름이 칸 너비에 맞게)
+            float nameMax = Math.Max(11F, Math.Min(26F, ch / k / 4.2f));
+            {
+                int most = 1; foreach (var l in byDay.Values) most = Math.Max(most, l.Count);
+                if (most > 1) nameMax = Math.Max(10F, Math.Min(nameMax, (ch / k - 30f) / most / 1.45f));
+                foreach (var l in byDay.Values)
+                    foreach (var st in l)
+                        using (var tf = Media.UiFont(nameMax, true))
+                        {
+                            float w = g.MeasureString(st.No + "번 " + Birthdays.NameOf(st), tf).Width / k;
+                            float lim = cw / k - 14f;
+                            if (w > lim) nameMax = Math.Max(10F, nameMax * lim / w);
+                        }
+            }
             using (var df = Media.UiFont(12F, true))
-            using (var nf = Media.UiFont(Math.Max(9F, Math.Min(15F, ch / k / 7.5f)), true))
+            using (var nf = Media.UiFont(nameMax, true))
             using (var tagF = Media.UiFont(9F, true))
                 for (int d = 1; d <= days; d++)
                 {
@@ -370,7 +398,7 @@ namespace ClassroomHud
                         float avail = r.Bottom - y - nf.GetHeight(g) - 6 * k;
                         if (img != null && avail > 24 * k)
                         {
-                            float sz = Math.Min(avail, r.Width - 16 * k);
+                            float sz = Math.Min(avail, Math.Min(r.Width - 16 * k, r.Height * 0.5f));
                             var ir = new System.Drawing.RectangleF(r.X + (r.Width - sz) / 2, y, sz, sz);
                             using (var clip = new System.Drawing.Drawing2D.GraphicsPath()) { clip.AddEllipse(ir); var old = g.Clip; g.SetClip(clip); g.DrawImage(img, ir); g.Clip = old; }
                             y += sz + 3 * k;

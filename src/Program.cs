@@ -391,7 +391,7 @@ namespace ClassroomHud
             float K = 2f;
             var t = new DateTime(2026, 10, 8, 9, 45, 52);
             var work = new Rectangle(0, 0, 1800, 1400);
-            Func<Settings> def = () => { var s = Settings.Defaults(); s.Tools = new List<string> { "msgs", "pick", "memo", "week", "music", "noise", "meal", "vote" }; s.NewToolsAdded = true; s.MusicToolAdded = true; return s; };
+            Func<Settings> def = () => { var s = Settings.Defaults(); s.Tools = new List<string> { "msgs", "pick", "memo", "week", "music", "noise", "meal", "vote", "bday" }; s.NewToolsAdded = true; s.MusicToolAdded = true; s.BdayToolAdded = true; return s; };
             Action<string, Settings, HudState, DateTime> one = (name, S, st, now) =>
             {
                 var c = Painter.Compose(S, st, now, K, 900, 300, work);

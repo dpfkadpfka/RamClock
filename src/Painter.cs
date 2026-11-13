@@ -606,7 +606,7 @@ namespace ClassroomHud
             var tools = new List<Btn>();
             foreach (var t in Settings.ToolList)
                 if (S.Tools == null || S.Tools.Contains(t[0]))
-                    tools.Add(B(t[0], t[1], (t[0] == "msgs" && st.Popup == 2) || (t[0] == "memo" && st.MemoEdit) || (t[0] == "music" && st.MusicOpen) || (t[0] == "noise" && st.NoiseOpen) || (t[0] == "vote" && st.VoteOpen)));
+                    tools.Add(B(t[0], t[1], (t[0] == "msgs" && st.Popup == 2) || (t[0] == "memo" && st.MemoEdit) || (t[0] == "music" && st.MusicOpen) || (t[0] == "noise" && st.NoiseOpen) || (t[0] == "vote" && st.VoteOpen) || (t[0] == "bday" && BirthdayListForm.IsOpen)));
             foreach (var b0 in tools) b0.Glyph = true;
             if (tools.Count > 0) { var gt = G(null, false, tools.ToArray()); gt.Slot = "tools"; gs.Add(gt); }
 
@@ -1191,6 +1191,8 @@ namespace ClassroomHud
                     case "msgs": // 선생님 안내: 확성기
                         { var pts = new[] { P(3.5f, 10), P(3.5f, 14), P(6.5f, 14), P(13.5f, 18.5f), P(13.5f, 5.5f), P(6.5f, 10) }; g.DrawPolygon(pen, pts); }
                         ARC(14.35f, 12, 4, -48.6f, 97.2f); ARC(14.4f, 12, 7.5f, -47.2f, 94.4f); break;
+                    case "bday": // 생일 달력: 케이크
+                        RR(4, 12, 16, 9, 2); L(4, 16, 20, 16); L(12, 7.5f, 12, 12); DOT(12, 4.8f, 1.6f); L(8, 9.5f, 8, 12); L(16, 9.5f, 16, 12); break;
                     case "week": // 이번 주: 달력 + 체크
                         RR(3, 4, 18, 17, 2.5f); L(3, 9.5f, 21, 9.5f); L(8, 2.5f, 8, 5.5f); L(16, 2.5f, 16, 5.5f);
                         PL(new float[] { 8.5f, 15, 11, 17.5f, 15.5f, 13 }); break;

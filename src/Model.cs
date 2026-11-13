@@ -215,8 +215,9 @@ namespace ClassroomHud
         public int MusicDX { get; set; } = int.MinValue;
         public int MusicDY { get; set; }
         public bool MusicToolAdded { get; set; }
+        public bool BdayToolAdded { get; set; }
         public List<string> Tools { get; set; }       // 시계 아래 [교실 도구]에 보일 버튼
-        public static readonly string[][] ToolList = { new[] { "msgs", "선생님 안내" }, new[] { "pick", "뽑기" }, new[] { "memo", "텍스트" }, new[] { "week", "이번 주" }, new[] { "music", "음악" }, new[] { "noise", "소음 신호등" }, new[] { "meal", "오늘 급식" }, new[] { "vote", "투표" } };
+        public static readonly string[][] ToolList = { new[] { "msgs", "선생님 안내" }, new[] { "pick", "뽑기" }, new[] { "memo", "텍스트" }, new[] { "week", "이번 주" }, new[] { "bday", "생일 달력" }, new[] { "music", "음악" }, new[] { "noise", "소음 신호등" }, new[] { "meal", "오늘 급식" }, new[] { "vote", "투표" } };
         public static List<QuickLink> DefaultLinks()
         {
             return new List<QuickLink> { new QuickLink("아이스크림", "https://www.i-scream.co.kr"), new QuickLink("유튜브", "https://www.youtube.com") };
@@ -312,6 +313,7 @@ namespace ClassroomHud
             if (Links == null) Links = DefaultLinks();
             if (Tools == null) Tools = new List<string> { "pick", "memo" };   // 처음에는 뽑기·텍스트만
             if (!MusicToolAdded) { if (!Tools.Contains("music")) Tools.Add("music"); MusicToolAdded = true; }
+            if (!BdayToolAdded) { if (!Tools.Contains("bday")) { int w = Tools.IndexOf("week"); Tools.Insert(w >= 0 ? w + 1 : Tools.Count, "bday"); } BdayToolAdded = true; }
             if (Playlists == null) Playlists = new List<QuickLink>();
             if (!NewToolsAdded) { foreach (var t in new[] { "noise", "meal", "vote" }) if (!Tools.Contains(t)) Tools.Add(t); NewToolsAdded = true; }
             NoiseYellow = Math.Max(5, Math.Min(90, NoiseYellow)); NoiseRed = Math.Max(NoiseYellow + 5, Math.Min(98, NoiseRed));
